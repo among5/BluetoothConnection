@@ -4,6 +4,9 @@ using Android.Content;
 using Android.OS;
 using Android.Support.Wearable.Activity;
 using Android.Widget;
+using Java.IO;
+using System.Text;
+using System.Threading;
 
 namespace blueTest
 {
@@ -20,6 +23,14 @@ namespace blueTest
     private ListView listView;
     private ArrayAdapter adapter;
     private SampleReceiver BroadcastReceiver;
+
+    private SendData mChatService = null;
+
+    private BluetoothServerSocket bluetoothServerSocket;
+    private Thread thread;
+
+    private StringBuilder mOutStringBuffer;
+
 
 
     protected override void OnCreate(Bundle bundle)
@@ -38,13 +49,15 @@ namespace blueTest
       listView.Adapter = adapter;
       bluetoothAdapter = BluetoothAdapter.DefaultAdapter;
       BroadcastReceiver = new SampleReceiver(adapter);
-
+      mOutStringBuffer = new StringBuilder("");
       if (!bluetoothAdapter.IsEnabled)
       {
         Intent enableBlueToothIntent = new Intent(BluetoothAdapter.ActionRequestEnable);
         StartActivityForResult(enableBlueToothIntent, ENABLE_BT_REQUEST_CODE);
+      }else if(mChatService == null)
+      {
+        setupTransfer();
       }
-
       toggleButton.Click += delegate
       {
 
@@ -71,6 +84,7 @@ namespace blueTest
 
             DiscoverDevices();
             MakeDiscoverable();
+         
           }
           else
           {
@@ -80,45 +94,32 @@ namespace blueTest
           }
         }
       };
+
+
+      
     }
 
-    //public void OnToggleClicked(View view)
-    //{
 
-    //  adapter.Clear();
+    private void setupTransfer()
+    {
+      string message = "Testing";
+      sendMessage(message);
+    }
 
-    //  ToggleButton toggleButton = (ToggleButton)view;
-    //  if (bluetoothAdapter == null)
-    //  {
-    //    Toast.MakeText(Application.Context, "Device doesn't support bluetooth", ToastLength.Short).Show();
-    //    toggleButton.Checked = false;
-    //  }
-    //  else
-    //  {
-    //    if (toggleButton.Checked == true)
-    //    {
-    //      if (!bluetoothAdapter.IsEnabled)
-    //      {
-    //        Intent enableBluetoothIntent = new Intent(BluetoothAdapter.ActionRequestEnable);
-    //        StartActivityForResult(enableBluetoothIntent, ENABLE_BT_REQUEST_CODE);
-    //      }
-    //      else
-    //      {
 
-    //        Toast.MakeText(Application.Context, "Device already enabled " + "\n" + "Scanning for remote Bluetooth devices..", ToastLength.Short).Show();
-    //        discoverDevices();
-    //        makeDiscoverable();
-    //      }
-    //    }
-    //    else
-    //    {
-    //      bluetoothAdapter.Disable();
-    //      adapter.Clear();
-    //      Toast.MakeText(Application.Context, "Device now disabled", ToastLength.Short).Show();
-    //    }
-    //  }
-    //}
+    private void sendMessage(string message)
+    {
+      if(mChatService.getState() != SendData.STATE_CONNECTED)
+      {
+        Toast.MakeText(Application.Context, "NOT CONNECTED", ToastLength.Short).Show();
+        return;
+      }
+      byte[] send = Encoding.ASCII.GetBytes(message);
+      mChatService.write(send);
 
+      mOutStringBuffer.Length = 0;
+      
+    }
 
     protected override void OnActivityResult(int requestCode, Result result, Intent data)
     {
@@ -174,11 +175,14 @@ namespace blueTest
       this.RegisterReceiver(BroadcastReceiver, filter);
     }
 
+   
     protected override void OnStop()
     {
       base.OnStop();
       this.UnregisterReceiver(BroadcastReceiver);
     }
   }
+
+
 }
 

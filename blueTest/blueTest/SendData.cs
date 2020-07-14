@@ -1,104 +1,74 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using Android.App;
 using Android.Bluetooth;
-using Android.Content;
 using Android.OS;
-using Android.Runtime;
-using Android.Views;
-using Android.Wearable;
-using Android.Widget;
 using Java.Util;
+using System;
+using System.IO;
 
 namespace blueTest
 {
-
   public class SendData
   {
-
-    private BluetoothAdapter mAdapter { get; }
+    private BluetoothAdapter bluetoothAdapter { get; }
     private Handler mHandler { get; }
+
     private AcceptThread mSecureAcceptThread;
     private AcceptThread mInsecureAcceptThread;
     private ConnectedThread mConnectedThread;
 
     private UUID uuid;
+    private StateEnum state;
 
-    private int mState;
-    private int mNewState;
-
-
-    public const int STATE_NONE = 0;       // we're doing nothing
-    public const int STATE_LISTEN = 1;     // now listening for incoming connections
-    public const int STATE_CONNECTING = 2; // now initiating an outgoing connection
-    public const int STATE_CONNECTED = 3;  // now connected to a remote device
-
-
-    public SendData(Context context, Handler handler)
+    public SendData(Handler handler)
     {
-      mAdapter = BluetoothAdapter.DefaultAdapter;
-      mState = STATE_NONE;
-      mNewState = mState;
+      bluetoothAdapter = BluetoothAdapter.DefaultAdapter;
+      state = StateEnum.None;
       mHandler = handler;
       uuid = UUID.FromString("c88ae110-c0e0-11ea-b3de-0242ac130004");
-
     }
 
-
-
-    public int getState()
+    public StateEnum GetState()
     {
-      return mState;
+      return state;
     }
 
-    public void start()
+    public void Start()
     {
-
-
       // Cancel any thread currently running a connection
       if (mConnectedThread != null)
       {
-        mConnectedThread.cancel();
+        mConnectedThread.Cancel();
         mConnectedThread = null;
       }
 
       // Start the thread to listen on a BluetoothServerSocket
-      if (mSecureAcceptThread == null)
+      if (mSecureAcceptThread is null)
       {
         mSecureAcceptThread = new AcceptThread(true, this);
-        mSecureAcceptThread.run();
+        mSecureAcceptThread.Run();
       }
 
-      mState = SendData.STATE_CONNECTED;
+      state = StateEnum.Connected;
     }
 
-
-    public void connected(BluetoothSocket socket, BluetoothDevice
-            device, String socketType)
+    public void Connected(BluetoothSocket socket, BluetoothDevice
+            device, string socketType)
     {
-
-
-
       // Cancel any thread currently running a connection
       if (mConnectedThread != null)
       {
-        mConnectedThread.cancel();
+        mConnectedThread.Cancel();
         mConnectedThread = null;
       }
 
       // Cancel the accept thread because we only want to connect to one device
       if (mSecureAcceptThread != null)
       {
-        mSecureAcceptThread.cancel();
+        mSecureAcceptThread.Cancel();
         mSecureAcceptThread = null;
       }
       if (mInsecureAcceptThread != null)
       {
-        mInsecureAcceptThread.cancel();
+        mInsecureAcceptThread.Cancel();
         mInsecureAcceptThread = null;
       }
 
@@ -112,61 +82,58 @@ namespace blueTest
       bundle.PutString(Constants.DEVICE_NAME, device.Name);
       msg.Data = bundle;
       mHandler.SendMessage(msg);
-
     }
 
-
-
-
-    public void stop()
+    public void Stop()
     {
       if (mConnectedThread != null)
       {
-        mConnectedThread.cancel();
+        mConnectedThread.Cancel();
         mConnectedThread = null;
       }
 
       if (mSecureAcceptThread != null)
       {
-        mSecureAcceptThread.cancel();
+        mSecureAcceptThread.Cancel();
         mSecureAcceptThread = null;
       }
 
       if (mInsecureAcceptThread != null)
       {
-        mInsecureAcceptThread.cancel();
+        mInsecureAcceptThread.Cancel();
         mInsecureAcceptThread = null;
       }
 
-      mState = STATE_NONE;
+      state = StateEnum.None;
     }
 
-    public void write(byte[] message)
+    public void Write(byte[] message)
     {
       ConnectedThread r;
-      if (mState != STATE_CONNECTED) { return; }
+      if (state != StateEnum.Connected)
+      {
+        return;
+      }
+
       r = mConnectedThread;
-      r.write(message);
+      r.Write(message);
     }
 
-
-    private void connectionLost()
+    private void ConnectionLost()
     {
       Message msg = mHandler.ObtainMessage(Constants.MESSAGE_TOAST);
       Bundle bundle = new Bundle();
       bundle.PutString(Constants.TOAST, "Device connection lost");
       msg.Data = bundle;
       mHandler.SendMessage(msg);
-      mState = STATE_NONE;
-      this.start();
+      state = StateEnum.None;
+      this.Start();
     }
-
-
 
     internal class AcceptThread
     {
       private readonly BluetoothServerSocket mmServerSocket;
-      private String mSocketType;
+      private string mSocketType;
       private SendData sendData;
 
       public AcceptThread(Boolean secure, SendData sd)
@@ -179,11 +146,11 @@ namespace blueTest
           if (secure)
           {
 
-            temp = sendData.mAdapter.ListenUsingRfcommWithServiceRecord("Bluetooth Chat Service", sendData.uuid);
+            temp = sendData.bluetoothAdapter.ListenUsingRfcommWithServiceRecord("Bluetooth Chat Service", sendData.uuid);
           }
           else
           {
-            temp = sendData.mAdapter.ListenUsingInsecureRfcommWithServiceRecord("Insecure Bluetooth Chat Service", sendData.uuid);
+            temp = sendData.bluetoothAdapter.ListenUsingInsecureRfcommWithServiceRecord("Insecure Bluetooth Chat Service", sendData.uuid);
           }
         }
         catch (IOException e)
@@ -192,18 +159,18 @@ namespace blueTest
         }
 
         mmServerSocket = temp;
-        sendData.mState = STATE_LISTEN;
+        sendData.state = StateEnum.Listen;
       }
 
-      public void run()
+      public void Run()
       {
-        BluetoothSocket socket = null;
-        while (sendData.mState != STATE_CONNECTED)
+        BluetoothSocket socket;
+        while (sendData.state != StateEnum.Connected)
         {
           try
           {
             socket = mmServerSocket.Accept();
-            sendData.mState = STATE_CONNECTING;
+            sendData.state = StateEnum.Connecting;
           }
           catch (IOException e)
           {
@@ -213,12 +180,12 @@ namespace blueTest
 
           if (socket != null)
           {
-            if (sendData.getState() == STATE_CONNECTING)
+            if (sendData.GetState() == StateEnum.Connecting)
             {
-              sendData.connected(socket, socket.RemoteDevice, mSocketType);
+              sendData.Connected(socket, socket.RemoteDevice, mSocketType);
 
             }
-            else if (sendData.getState() == STATE_CONNECTED)
+            else if (sendData.GetState() == StateEnum.Connected)
             {
               mmServerSocket.Close();
             }
@@ -227,7 +194,7 @@ namespace blueTest
       }
 
 
-      public void cancel()
+      public void Cancel()
       {
         try
         {
@@ -239,11 +206,6 @@ namespace blueTest
         }
       }
     }
-
-
-
-
-
 
     internal class ConnectedThread
     {
@@ -257,6 +219,7 @@ namespace blueTest
         Stream tempIn = null;
         Stream tempOut = null;
         sd = sendData;
+
         try
         {
           tempIn = socket.InputStream;
@@ -266,17 +229,17 @@ namespace blueTest
         {
           Console.WriteLine(e.ToString() + "!!!");
         }
+
         mmInStream = tempIn;
         mmOutStream = tempOut;
-        sd.mState = STATE_CONNECTED;
+        sd.state = StateEnum.Connected;
       }
 
-
-      public void run()
+      public void Run()
       {
         byte[] buffer = new byte[1024];
         int bytes;
-        while (sd.mState == STATE_CONNECTED)
+        while (sd.state == StateEnum.Connected)
         {
           try
           {
@@ -287,19 +250,18 @@ namespace blueTest
           catch (IOException e)
           {
             Console.Write(e.ToString() + "!!!");
-            sd.connectionLost();
+            sd.ConnectionLost();
             break;
           }
         }
       }
 
-
-      public void write(byte[] buffer)
+      public void Write(byte[] buffer)
       {
         try
         {
           mmOutStream.Write(buffer);
-          System.Console.WriteLine(buffer.ToString());
+          Console.WriteLine(buffer.ToString());
           sd.mHandler.ObtainMessage(Constants.MESSAGE_WRITE, -1, -1, buffer).SendToTarget();
         }
         catch (IOException e)
@@ -308,7 +270,7 @@ namespace blueTest
         }
       }
 
-      public void cancel()
+      public void Cancel()
       {
         try
         {
@@ -319,11 +281,8 @@ namespace blueTest
           Console.WriteLine(e.ToString() + "!!!");
         }
       }
-
     }
-
   }
-
 }
 
 

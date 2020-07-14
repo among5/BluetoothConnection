@@ -148,8 +148,8 @@ namespace blueTest
 
     private void SetupTransfer()
     {
-      mChatService = new SendData(this, mHandler);
-      mChatService.start();
+      mChatService = new SendData(mHandler);
+      mChatService.Start();
       string message = "Testing";
 
       SendMessage(message);
@@ -157,7 +157,7 @@ namespace blueTest
 
     private void SendMessage(string message)
     {
-      if (mChatService.getState() != SendData.STATE_CONNECTED)
+      if (mChatService.GetState() != StateEnum.Connected)
       {
         Toast.MakeText(Application.Context, "NOT CONNECTED", ToastLength.Short).Show();
         return;
@@ -165,7 +165,7 @@ namespace blueTest
       byte[] send = Encoding.ASCII.GetBytes(message);
       for (int i = 0; i < 50; i++)
       {
-        mChatService.write(send);
+        mChatService.Write(send);
       }
     }
   }

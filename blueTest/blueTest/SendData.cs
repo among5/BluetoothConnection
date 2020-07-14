@@ -130,6 +130,28 @@ namespace blueTest
       this.Start();
     }
 
+    private void Disconnect()
+    {
+      if (mConnectedThread != null)
+      {
+        mConnectedThread.Cancel();
+        mConnectedThread = null;
+      }
+
+      if(mSecureAcceptThread != null)
+      {
+        mSecureAcceptThread.Cancel();
+        mSecureAcceptThread = null;
+      }
+
+      if(mInsecureAcceptThread != null)
+      {
+        mInsecureAcceptThread.Cancel();
+        mInsecureAcceptThread = null;
+      }
+      this.Start();
+    }
+
     internal class AcceptThread
     {
       private readonly BluetoothServerSocket mmServerSocket;
@@ -264,9 +286,10 @@ namespace blueTest
           Console.WriteLine(buffer.ToString());
           sd.mHandler.ObtainMessage(Constants.MESSAGE_WRITE, -1, -1, buffer).SendToTarget();
         }
-        catch (IOException e)
+        catch (Exception e)
         {
           Console.WriteLine(e.ToString() + "!!!");
+          sd.Disconnect();
         }
       }
 
@@ -281,6 +304,8 @@ namespace blueTest
           Console.WriteLine(e.ToString() + "!!!");
         }
       }
+
+     
     }
   }
 }

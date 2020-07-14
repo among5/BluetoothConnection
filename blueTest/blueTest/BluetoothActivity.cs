@@ -27,7 +27,7 @@ namespace blueTest
     private ArrayAdapter adapter;
     private SampleReceiver broadcastReceiver;
 
-
+  
     protected override void OnCreate(Bundle bundle)
     {
       base.OnCreate(bundle);

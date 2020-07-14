@@ -36,6 +36,14 @@
           android:layout_alignParentTop="true"
           android:layout_alignParentLeft="true"
           android:layout_alignParentStart="true" />
+    <TextView
+      android:layout_width="122.0dp"
+      android:layout_height="144.0dp"
+      android:text = "Hola"
+      android:id="@+id/moose"
+      android:layout_marginTop="0.0dp"
+      android:layout_alignParentRight="true"
+      android:layout_alignParentBottom="true" />
      
   </RelativeLayout>
 </android.support.wear.widget.BoxInsetLayout>

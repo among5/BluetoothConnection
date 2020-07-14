@@ -4,73 +4,59 @@ using Android.Content;
 using Android.OS;
 using Android.Support.Wearable.Activity;
 using Android.Widget;
-using Java.IO;
 using System.Text;
-using System.Threading;
 
 namespace blueTest
 {
   [Activity(Label = "@string/app_name", MainLauncher = true)]
-  public class MainActivity : WearableActivity { 
-   private const int ENABLE_BT_REQUEST_CODE = 1;
+  public class MainActivity : WearableActivity
+  {
+    private const int ENABLE_BT_REQUEST_CODE = 1;
     private const int DISCOVERABLE_DURATION = 3000;
     private const int DISCOVERABLE_BT_REQUEST_CODE = 2;
 
     private TextView textView;
+    private TextView textView2;
+    private ListView listView;
 
     private BluetoothAdapter bluetoothAdapter;
     private ToggleButton toggleButton;
-    private ListView listView;
     private ArrayAdapter adapter;
     private SampleReceiver BroadcastReceiver;
-
+    private Handler mHandler;
     private SendData mChatService = null;
-
-    private BluetoothServerSocket bluetoothServerSocket;
-    private Thread thread;
-
-    private StringBuilder mOutStringBuffer;
-
-
 
     protected override void OnCreate(Bundle bundle)
     {
       base.OnCreate(bundle);
       SetContentView(Resource.Layout.activity_main);
 
-     // textView = FindViewById<TextView>(Resource.Id.textView);
+      textView = FindViewById<TextView>(Resource.Id.textView);
       SetAmbientEnabled();
 
       toggleButton = FindViewById<ToggleButton>(Resource.Id.toggleButton);
 
       listView = FindViewById<ListView>(Resource.Id.foundDevices);
-      string[] animalList = {"Lion", "Tiger", "Moose" };
-      adapter = new ArrayAdapter(this, Android.Resource.Layout.SimpleListItem1);
-      listView.Adapter = adapter;
       bluetoothAdapter = BluetoothAdapter.DefaultAdapter;
       BroadcastReceiver = new SampleReceiver(adapter);
-      mOutStringBuffer = new StringBuilder("");
+      mHandler = new Handler();
+      textView2 = FindViewById<TextView>(Resource.Id.moose);
       if (!bluetoothAdapter.IsEnabled)
       {
         Intent enableBlueToothIntent = new Intent(BluetoothAdapter.ActionRequestEnable);
         StartActivityForResult(enableBlueToothIntent, ENABLE_BT_REQUEST_CODE);
-      }else if(mChatService == null)
-      {
-        setupTransfer();
       }
+
       toggleButton.Click += delegate
       {
-
-        //adapter.Clear();
-
-        if (bluetoothAdapter == null)
+        if (bluetoothAdapter is null)
         {
           Toast.MakeText(Application.Context, "Device doesn't support bluetooth", ToastLength.Short).Show();
           toggleButton.Checked = false;
         }
         else
         {
-          if (toggleButton.Checked == true)
+          if (toggleButton.Checked)
           {
             if (!bluetoothAdapter.IsEnabled)
             {
@@ -84,7 +70,6 @@ namespace blueTest
 
             DiscoverDevices();
             MakeDiscoverable();
-         
           }
           else
           {
@@ -94,31 +79,18 @@ namespace blueTest
           }
         }
       };
-
-
-      
     }
 
-
-    private void setupTransfer()
+    protected override void OnStart()
     {
-      string message = "Testing";
-      sendMessage(message);
-    }
-
-
-    private void sendMessage(string message)
-    {
-      if(mChatService.getState() != SendData.STATE_CONNECTED)
+      base.OnStart();
+      if (mChatService is null)
       {
-        Toast.MakeText(Application.Context, "NOT CONNECTED", ToastLength.Short).Show();
-        return;
+        SetupTransfer();
       }
-      byte[] send = Encoding.ASCII.GetBytes(message);
-      mChatService.write(send);
 
-      mOutStringBuffer.Length = 0;
-      
+      BroadcastReceiver = new SampleReceiver(adapter);
+      //  this.RegisterReceiver(BroadcastReceiver);
     }
 
     protected override void OnActivityResult(int requestCode, Result result, Intent data)
@@ -168,20 +140,38 @@ namespace blueTest
       }
     }
 
-    protected override void OnResume()
-    {
-      base.OnResume();
-      IntentFilter filter = new IntentFilter(BluetoothDevice.ActionFound);
-      this.RegisterReceiver(BroadcastReceiver, filter);
-    }
-
-   
     protected override void OnStop()
     {
       base.OnStop();
-      this.UnregisterReceiver(BroadcastReceiver);
+      //this.UnregisterReceiver(BroadcastReceiver);
+    }
+
+    private void SetupTransfer()
+    {
+      mChatService = new SendData(this, mHandler);
+      mChatService.start();
+      string message = "Testing";
+
+      SendMessage(message);
+    }
+
+    private void SendMessage(string message)
+    {
+      if (mChatService.getState() != SendData.STATE_CONNECTED)
+      {
+        Toast.MakeText(Application.Context, "NOT CONNECTED", ToastLength.Short).Show();
+        return;
+      }
+      byte[] send = Encoding.ASCII.GetBytes(message);
+      for (int i = 0; i < 50; i++)
+      {
+        mChatService.write(send);
+      }
     }
   }
+
+
+
 
 
 }

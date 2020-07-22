@@ -52,9 +52,7 @@
     <Reference Include="Mono.Android" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BluetoothActivity.cs" />
     <Compile Include="Constants.cs" />
-    <Compile Include="GetBluetoothActivity.cs" />
     <Compile Include="MainActivity.cs" />
     <Compile Include="Resources\Resource.designer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

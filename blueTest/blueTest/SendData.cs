@@ -3,6 +3,7 @@ using Android.OS;
 using Java.Util;
 using System;
 using System.IO;
+using System.Text;
 
 namespace blueTest
 {
@@ -283,7 +284,7 @@ namespace blueTest
         try
         {
           mmOutStream.Write(buffer);
-          Console.WriteLine(buffer.ToString());
+          Console.WriteLine(Encoding.UTF8.GetString(buffer));
           sd.mHandler.ObtainMessage(Constants.MESSAGE_WRITE, -1, -1, buffer).SendToTarget();
         }
         catch (Exception e)

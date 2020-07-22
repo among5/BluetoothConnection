@@ -41,7 +41,7 @@ namespace blueTest
       base.OnCreate(bundle);
       SetContentView(Resource.Layout.activity_main);
 
-      textView = FindViewById<TextView>(Resource.Id.textView);
+     // textView = FindViewById<TextView>(Resource.Id.textView);
       SetAmbientEnabled();
 
       toggleButton = FindViewById<ToggleButton>(Resource.Id.toggleButton);
@@ -50,7 +50,7 @@ namespace blueTest
       bluetoothAdapter = BluetoothAdapter.DefaultAdapter;
       BroadcastReceiver = new SampleReceiver(adapter);
       mHandler = new Handler();
-      textView2 = FindViewById<TextView>(Resource.Id.moose);
+      //textView2 = FindViewById<TextView>(Resource.Id.moose);
 
       sensor_manager = (SensorManager)GetSystemService(Context.SensorService);
       sensor = sensor_manager.GetDefaultSensor(SensorType.Accelerometer);
@@ -68,27 +68,23 @@ namespace blueTest
 
       if (sensor_manager.GetDefaultSensor(SensorType.Accelerometer) != null)
       {
-        textView.Text = "ACCELEROMETER DETECTED";
+       // textView.Text = "ACCELEROMETER DETECTED";
         vibrator.Vibrate(500);
-      }
-
-
-      if (!bluetoothAdapter.IsEnabled)
-      {
-        Intent enableBlueToothIntent = new Intent(BluetoothAdapter.ActionRequestEnable);
-        StartActivityForResult(enableBlueToothIntent, ENABLE_BT_REQUEST_CODE);
       }
 
       toggleButton.Click += delegate
       {
-        if (bluetoothAdapter is null)
+
+        //adapter.Clear();
+
+        if (bluetoothAdapter == null)
         {
           Toast.MakeText(Application.Context, "Device doesn't support bluetooth", ToastLength.Short).Show();
           toggleButton.Checked = false;
         }
         else
         {
-          if (toggleButton.Checked)
+          if (toggleButton.Checked == true)
           {
             if (!bluetoothAdapter.IsEnabled)
             {
@@ -106,11 +102,15 @@ namespace blueTest
           else
           {
             bluetoothAdapter.Disable();
-            adapter.Clear();
+           // adapter.Clear();
             Toast.MakeText(Application.Context, "Device now disabled", ToastLength.Short).Show();
           }
         }
       };
+
+
+
+
     }
 
 
@@ -140,9 +140,9 @@ namespace blueTest
       switch (e.Sensor.Type)
       {
         case SensorType.Accelerometer:
-          byte[] accelX = Encoding.ASCII.GetBytes(e.Values[0].ToString());
-          byte[] accelY = Encoding.ASCII.GetBytes(e.Values[1].ToString());
-          byte[] accelZ = Encoding.ASCII.GetBytes(e.Values[2].ToString());
+          byte[] accelX = BitConverter.GetBytes(e.Values[0]);
+          byte[] accelY = BitConverter.GetBytes(e.Values[1]);
+          byte[] accelZ = BitConverter.GetBytes(e.Values[2]);
           for (int i = 3; i < 15; i++)
           {
             if (i < 7)
@@ -211,9 +211,9 @@ namespace blueTest
           break;
 
         case SensorType.Gyroscope:
-          byte[] gyrX = Encoding.ASCII.GetBytes(e.Values[0].ToString());
-          byte[] gyrY = Encoding.ASCII.GetBytes(e.Values[1].ToString());
-          byte[] gyrZ = Encoding.ASCII.GetBytes(e.Values[2].ToString());
+          byte[] gyrX = BitConverter.GetBytes(e.Values[0]);
+          byte[] gyrY = BitConverter.GetBytes(e.Values[1]);
+          byte[] gyrZ = BitConverter.GetBytes(e.Values[2]);
           for (int i = 15; i < 27; i++)
           {
             if (i < 19)
@@ -297,6 +297,7 @@ namespace blueTest
       }
 
       BroadcastReceiver = new SampleReceiver(adapter);
+
     }
 
     protected override void OnActivityResult(int requestCode, Result result, Intent data)

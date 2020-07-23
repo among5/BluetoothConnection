@@ -1,12 +1,11 @@
 using Android.App;
 using Android.Bluetooth;
 using Android.Content;
-using Android.OS;
 using Android.Hardware;
+using Android.OS;
+using Android.Runtime;
 using Android.Support.Wearable.Activity;
 using Android.Widget;
-using Android.Runtime;
-using System.Text;
 using System;
 
 namespace blueTest
@@ -18,45 +17,32 @@ namespace blueTest
     private const int DISCOVERABLE_DURATION = 3000;
     private const int DISCOVERABLE_BT_REQUEST_CODE = 2;
 
-    private TextView textView;
-    private TextView textView2;
-    private ListView listView;
-
     private BluetoothAdapter bluetoothAdapter;
-    private ToggleButton toggleButton;
-    private ArrayAdapter adapter;
-    private SampleReceiver BroadcastReceiver;
-    private Handler mHandler;
-    private SendData mChatService = null;
+    private Handler messageHandler;
+    private SendData messageChatService;
 
     private SensorManager sensor_manager;
     private Sensor sensor;
-    private TextView accelerometerData;
     private Vibrator vibrator;
     private Sensor gyro;
-
     private byte[] package;
+
     protected override void OnCreate(Bundle bundle)
     {
       base.OnCreate(bundle);
       SetContentView(Resource.Layout.activity_main);
 
-     // textView = FindViewById<TextView>(Resource.Id.textView);
       SetAmbientEnabled();
 
-      toggleButton = FindViewById<ToggleButton>(Resource.Id.toggleButton);
-
-      listView = FindViewById<ListView>(Resource.Id.foundDevices);
       bluetoothAdapter = BluetoothAdapter.DefaultAdapter;
-      BroadcastReceiver = new SampleReceiver(adapter);
-      mHandler = new Handler();
-      //textView2 = FindViewById<TextView>(Resource.Id.moose);
+      messageHandler = new Handler();
 
       sensor_manager = (SensorManager)GetSystemService(Context.SensorService);
       sensor = sensor_manager.GetDefaultSensor(SensorType.Accelerometer);
       gyro = sensor_manager.GetDefaultSensor(SensorType.Gyroscope);
       vibrator = (Vibrator)GetSystemService(VibratorService);
 
+      package = new byte[39];
       package = new byte[39];
       for(int i=0; i<package.Length; i++)
       {
@@ -66,77 +52,24 @@ namespace blueTest
       package[1] = Convert.ToByte('A');
       package[2] = Convert.ToByte('P');
 
+
       if (sensor_manager.GetDefaultSensor(SensorType.Accelerometer) != null)
       {
-       // textView.Text = "ACCELEROMETER DETECTED";
         vibrator.Vibrate(500);
       }
-
-      toggleButton.Click += delegate
-      {
-
-        //adapter.Clear();
-
-        if (bluetoothAdapter == null)
-        {
-          Toast.MakeText(Application.Context, "Device doesn't support bluetooth", ToastLength.Short).Show();
-          toggleButton.Checked = false;
-        }
-        else
-        {
-          if (toggleButton.Checked == true)
-          {
-            if (!bluetoothAdapter.IsEnabled)
-            {
-              Intent enableBluetoothIntent = new Intent(BluetoothAdapter.ActionRequestEnable);
-              StartActivityForResult(enableBluetoothIntent, ENABLE_BT_REQUEST_CODE);
-            }
-            else
-            {
-              Toast.MakeText(Application.Context, "Device already enabled " + "\n" + "Scanning for remote Bluetooth devices..", ToastLength.Short).Show();
-            }
-
-            DiscoverDevices();
-            MakeDiscoverable();
-          }
-          else
-          {
-            bluetoothAdapter.Disable();
-           // adapter.Clear();
-            Toast.MakeText(Application.Context, "Device now disabled", ToastLength.Short).Show();
-          }
-        }
-      };
-
-
-
-
+     
+      StartBluetooth();
     }
-
-
 
     public void OnAccuracyChanged(Sensor sensor, [GeneratedEnum] SensorStatus accuracy)
-    {
-
-    }
-
-
-    protected override void OnResume()
-    {
-      base.OnResume();
-      sensor_manager.RegisterListener(this, sensor, SensorDelay.Normal);
-      sensor_manager.RegisterListener(this, gyro, SensorDelay.Normal);
-    }
-
-    protected override void OnPause()
-    {
-      base.OnPause();
-      sensor_manager.UnregisterListener(this);
+    {  
     }
 
     public void OnSensorChanged(SensorEvent e)
     {
-     
+      //Updates package of bytes based on which sensor updated and sends over new data
+      // through bluetooth
+      // If byte[] is ever less than length 4, sets extra values to 0
       switch (e.Sensor.Type)
       {
         case SensorType.Accelerometer:
@@ -164,7 +97,8 @@ namespace blueTest
                 accelX = temp;
               }
               package[i] = accelX[i - 3];
-            }else if (i < 11)
+            }
+            else if (i < 11)
             {
               if (accelY.Length < 4)
               {
@@ -185,7 +119,7 @@ namespace blueTest
 
 
               package[i] = accelY[i - 7];
-              }
+            }
             else
             {
               if (accelZ.Length < 4)
@@ -234,7 +168,7 @@ namespace blueTest
                 }
                 gyrX = temp;
               }
-              package[i] = gyrX[i-15];
+              package[i] = gyrX[i - 15];
             }
             else if (i < 23)
             {
@@ -252,7 +186,7 @@ namespace blueTest
                     temp[j] = 0;
                   }
                 }
-               gyrY = temp;
+                gyrY = temp;
               }
               package[i] = gyrY[i - 19];
             }
@@ -284,22 +218,29 @@ namespace blueTest
       }
     }
 
+    protected override void OnResume()
+    {
+      base.OnResume();
+      sensor_manager.RegisterListener(this, sensor, SensorDelay.Normal);
+      sensor_manager.RegisterListener(this, gyro, SensorDelay.Normal);
+    }
 
-
-
+    protected override void OnPause()
+    {
+      base.OnPause();
+      sensor_manager.UnregisterListener(this);
+    }
 
     protected override void OnStart()
     {
       base.OnStart();
-      if (mChatService is null)
+      if (messageChatService is null)
       {
+        //On start, restart the bluetooth connection
         SetupTransfer();
       }
-
-      BroadcastReceiver = new SampleReceiver(adapter);
-
     }
-
+ 
     protected override void OnActivityResult(int requestCode, Result result, Intent data)
     {
       base.OnActivityResult(requestCode, result, data);
@@ -327,6 +268,30 @@ namespace blueTest
       }
     }
 
+
+    //Makes device discoverable and enables bluetooth connection on device to PC
+    protected void StartBluetooth()
+    {
+      if (bluetoothAdapter == null)
+      {
+        Toast.MakeText(Application.Context, "Device doesn't support bluetooth", ToastLength.Short).Show();
+      }
+      else
+      {
+        if (!bluetoothAdapter.IsEnabled)
+        {
+          Intent enableBluetoothIntent = new Intent(BluetoothAdapter.ActionRequestEnable);
+          StartActivityForResult(enableBluetoothIntent, ENABLE_BT_REQUEST_CODE);
+        }
+        else
+        {
+          Toast.MakeText(Application.Context, "Device already enabled " + "\n" + "Scanning for remote Bluetooth devices..", ToastLength.Short).Show();
+        }
+
+        DiscoverDevices();
+        MakeDiscoverable();
+      }
+    }
     protected void MakeDiscoverable()
     {
       Intent discoverableIntent = new Intent(BluetoothAdapter.ActionRequestDiscoverable);
@@ -340,6 +305,7 @@ namespace blueTest
       if (bluetoothAdapter.StartDiscovery())
       {
         Toast.MakeText(Application.Context, "Discovering other devices...", ToastLength.Short).Show();
+        
       }
       else
       {
@@ -354,49 +320,28 @@ namespace blueTest
       //this.UnregisterReceiver(BroadcastReceiver);
     }
 
+    //Creates new instance of SendData and starts AcceptThread to accept new connections
     private void SetupTransfer()
     {
-      mChatService = new SendData(mHandler);
-      mChatService.Start();
-      string message = "TestingTestingTestingTestingTestingTEST";
-
-      SendMessage(message);
-    }
-
-    private void SendMessage(string message)
-    {
-      if (mChatService.GetState() != StateEnum.Connected)
-      {
-        Toast.MakeText(Application.Context, "NOT CONNECTED", ToastLength.Short).Show();
-        return;
-      }
-      byte[] send = Encoding.ASCII.GetBytes(message);
-      Array.Resize(ref send, 39);
-      //for (int i = 0; i < 50; i++)
-      
-        mChatService.Write(send);
-      
+      messageChatService = new SendData(messageHandler);
+      messageChatService.Start();
     }
 
     private void SendMessage(byte[] message)
     {
-      if (mChatService.GetState() != StateEnum.Connected)
+      if (messageChatService.GetState() != StateEnum.Connected)
       {
         Toast.MakeText(Application.Context, "NOT CONNECTED", ToastLength.Short).Show();
         return;
       }
+
       if(message.Length != 39)
       {
-        Array.Resize(ref message, 39);
+        throw new ArgumentException("Length != 39");
       }   
 
-      mChatService.Write(message);
+      messageChatService.Write(message);
     }
   }
-
-
-
-
-
 }
 

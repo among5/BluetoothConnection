@@ -10,14 +10,12 @@ namespace blueTest
     private readonly ArrayAdapter adapter;
 
     public SampleReceiver()
-    {
-      adapter = null;
-    }
+    { }
+
     public SampleReceiver(ArrayAdapter givenAdapter)
     {
       this.adapter = givenAdapter;
-    }
- 
+    } 
 
     public override void OnReceive(Context context, Intent intent)
     {

@@ -12,29 +12,6 @@
     android:padding="@dimen/inner_frame_layout_padding"
     app:boxedEdges="all">
 
-    <ListView
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:id="@+id/foundDevices"
-      android:layout_centerHorizontal="true"
-      android:layout_below="@+id/toggleButton" />
-
-    <TextView
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:id="@+id/textView"
-      android:gravity="center"
-      android:text = "AHHH"/>
-    <ToggleButton
-      android:layout_width="match_parent"
-      android:layout_height="match_parent"
-      android:id="@+id/toggleButton"
-      android:textOn="Bluetooth On"
-      android:textOff="Bluetooth Off"
-      android:onClick="OnToggleClicked"
-      android:layout_alignParentTop="true"
-      android:layout_alignParentLeft="true"
-      android:layout_alignParentStart="true"
-      android:layout_toRightOf="@id/toggleButton" />
+    
   </RelativeLayout>
 </android.support.wear.widget.BoxInsetLayout>

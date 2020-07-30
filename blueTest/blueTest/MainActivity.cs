@@ -57,7 +57,7 @@ namespace blueTest
       {
         vibrator.Vibrate(500);
       }
-     
+   
       StartBluetooth();
     }
 
@@ -289,7 +289,7 @@ namespace blueTest
         }
 
         DiscoverDevices();
-        MakeDiscoverable();
+       // MakeDiscoverable();
       }
     }
     protected void MakeDiscoverable()
@@ -316,7 +316,7 @@ namespace blueTest
     protected override void OnStop()
     {
       base.OnStop();
-      SetupTransfer();
+     // SetupTransfer();
       //this.UnregisterReceiver(BroadcastReceiver);
     }
 

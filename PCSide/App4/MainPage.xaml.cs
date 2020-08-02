@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Xml.Linq;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.Rfcomm;
@@ -46,16 +47,21 @@ namespace App4
     private readonly List<double> _dataGyrX = new List<double>();
     private readonly List<double> _dataGyrY = new List<double>();
     private readonly List<double> _dataGyrZ = new List<double>();
-    private int shift => (int)ShiftSlider.Value;
+    //private int shift => (int)ShiftSlider.Value;
 
     private readonly ChartRenderer _chartRenderer;
 
     private DispatcherTimer dispatcherTimer;
 
     private double[] values;
+    List<double> storage = new List<double>();
+    private List<double> buffer;
+    private readonly object bufferLock = new object();
+    private readonly object timerLock = new object();
 
     private int counter;
 
+    private byte[] storeInputData = new byte[39];
     public MainPage()
     {
       this.InitializeComponent();
@@ -67,35 +73,46 @@ namespace App4
      
       stopwatch = new Stopwatch();
       stopwatch.Start();
-      DispatcherTimerSetup();
-
+      //DispatcherTimerSetup();
+      buffer = new List<double>();
       _chartRenderer = new ChartRenderer();
       values = new double[9];
+     
       DataContext = this;
       counter = 0;
-     
+
+
+      _dataAccelX.Add(0.0);
+      _dataAccelZ.Add(0.0);
+      _dataAccelY.Add(0.0);
 
     }
 
+    /*
     public void DispatcherTimerSetup()
     {
       dispatcherTimer = new DispatcherTimer();
       dispatcherTimer.Tick += dispatchedTimer_Tick;
 
-      dispatcherTimer.Interval = TimeSpan.FromMilliseconds(20);
+      dispatcherTimer.Interval = TimeSpan.FromMilliseconds(100);
       dispatcherTimer.Start();
     }
 
     public void dispatchedTimer_Tick(object sender, object e)
     {
-      canvas.Invalidate();
+      lock (timerLock) { 
+     // canvas.Invalidate();
+        }  
     }
+    */
+
+
     public ObservableCollection<RfcommChatDeviceDisplay> ResultCollection
     {
       get;
       private set;
     }
-
+    
     private void StopWatcher()
     {
       if (null != deviceWatcher)
@@ -450,8 +467,9 @@ namespace App4
           return;
         }
 
-        byte[] temp = new byte[39];
-        chatReader.ReadBytes(temp);
+       
+       
+        chatReader.ReadBytes(storeInputData);
         string store = "";
         //Stores time
         double AccelX = 0.0;
@@ -461,45 +479,24 @@ namespace App4
         double GyrY = 0.0;
         for (int i = 0; i < 9; i++)
         {
-          float curFloat = BitConverter.ToSingle(temp, i * 4 + 3);
+          float curFloat = BitConverter.ToSingle(storeInputData, i * 4 + 3);
           store = store + curFloat.ToString() + " ";
-          values[i] = (Convert.ToDouble(BitConverter.ToSingle(temp, i * 4 + 3)));
-          /*
-            if (i == 0)
-            {
-              AccelY = Convert.ToDouble(BitConverter.ToSingle(temp, i * 4 + 3));
-              AccelX = stopwatch.ElapsedMilliseconds;
-              valueList.Enqueue(new DataPoint() { X = AccelX, Y = AccelY });
-            }
-            
-            else if (i == 1)
-            {
-              AccelY = Convert.ToDouble(BitConverter.ToSingle(temp, i * 4 + 3));
-              valueList.Add(new DataPoint() { X = AccelX, Y = AccelY });
-            }
-            
-            else if (i == 3)
-            {
-              GyrY = Convert.ToDouble(BitConverter.ToSingle(temp, i * 4 + 3));
-              GyrX = stopwatch.ElapsedMilliseconds;
-              gyrValueList.Enqueue(new DataPoint() { X = GyrX, Y = GyrY });
-            }
-           
-            else if (i == 4)
-            {
-              GyrY = Convert.ToDouble(BitConverter.ToSingle(temp, i * 4 + 3));
-              gyrValueList.Add(new DataPoint() { X = GyrX, Y = GyrY });
-            }
-           
-          */
+          buffer.Add(Convert.ToDouble(BitConverter.ToSingle(storeInputData, i * 4 + 3)));
         }
+     
+       
+        
+          
+          canvas.Invalidate();
 
         
+       
         
         // ConversationList.Items.Add("Accelerometer: " + text.Substring(3,4) + ", " + text.Substring(7,4) + ", " + text.Substring(11,4) + " Gyroscope: " + text.Substring(15,4) + ", " + text.Substring(19,4) + ", " + text.Substring(23,4));
         // SensorText.Text = text;
 
-        SensorText.Text = store;
+        //SensorText.Text = store;
+       // logData(store);
        // Debug.WriteLine(store);
         ReceiveStringLoop(chatReader);
       }
@@ -524,16 +521,45 @@ namespace App4
 
     }
 
-    private void Canvas_OnDraw(CanvasControl sender, CanvasDrawEventArgs args)
+    private void Canvas_UpdateData(ICanvasAnimatedControl sender, CanvasAnimatedUpdateEventArgs args)
     {
-      _dataAccelX.Add(values[0]);
-      _dataAccelY.Add(values[1]);
-      _dataAccelZ.Add(values[2]);
-      args.DrawingSession.Clear(Colors.FloralWhite);
-      _chartRenderer.RenderData(canvas, args, Colors.Black, DataStrokeThickness, _dataAccelX, shift);
-      _chartRenderer.RenderData(canvas, args, Colors.DarkGreen, DataStrokeThickness, _dataAccelY, shift);
-      _chartRenderer.RenderData(canvas, args, Colors.Blue, DataStrokeThickness, _dataAccelZ, shift);
-     // _chartRenderer.RenderMovingAverage(canvas, args, Colors.DeepSkyBlue, DataStrokeThickness, 50, _dataAccelX);
+      if (buffer.Count != 0)
+      {
+
+        for (int i = 0; i < buffer.Count / 9; i = i + 9)
+        {
+          _dataAccelX.Add(buffer[i]);
+          _dataAccelY.Add(buffer[i + 1]);
+          _dataAccelZ.Add(buffer[i + 2]);
+        }
+        buffer.Clear();
+
+
+      }
+
+    }
+
+    private void Canvas_OnDraw(ICanvasAnimatedControl sender, CanvasAnimatedDrawEventArgs args)
+    {
+      int startMilli = DateTime.Now.Millisecond;
+      canvas.IsFixedTimeStep = false;
+
+
+      int width = 1100;
+      width = width - (width % 9) + 1;
+      if (_dataAccelX.Count > width)
+      {
+        _dataAccelX.RemoveRange(0, _dataAccelX.Count - width);
+        _dataAccelY.RemoveRange(0, _dataAccelY.Count - width);
+        _dataAccelZ.RemoveRange(0, _dataAccelZ.Count - width);
+      }
+
+      //args.DrawingSession.Clear(Colors.FloralWhite);
+      _chartRenderer.RenderData(canvas, args, Colors.Black, DataStrokeThickness, _dataAccelX, 32);
+      _chartRenderer.RenderData(canvas, args, Colors.DarkGreen, DataStrokeThickness, _dataAccelY, 32);
+      _chartRenderer.RenderData(canvas, args, Colors.Blue, DataStrokeThickness, _dataAccelZ, 32);
+     
+      // _chartRenderer.RenderMovingAverage(canvas, args, Colors.DeepSkyBlue, DataStrokeThickness, 50, _dataAccelX);
       _chartRenderer.RenderAxes(canvas, args);
       /*
       if (values != null)
@@ -546,17 +572,36 @@ namespace App4
       }
       */
 
-      if (_dataAccelX.Count > (int)canvas.ActualWidth)
-      {
-        _dataAccelX.RemoveRange(0, _dataAccelX.Count - (int)canvas.ActualWidth);
-        _dataAccelY.RemoveRange(0, _dataAccelY.Count - (int)canvas.ActualWidth);
-        _dataAccelZ.RemoveRange(0, _dataAccelZ.Count - (int)canvas.ActualWidth);
-      }
+      int endMilli = DateTime.Now.Millisecond;
+      Debug.WriteLine(endMilli - startMilli);
 
      
 
       
     }
+
+
+    private async void logData(string data)
+    {
+      Windows.Storage.StorageFolder storageFolder =
+    Windows.Storage.ApplicationData.Current.TemporaryFolder;
+      Windows.Storage.StorageFile sampleFile =
+    await storageFolder.GetFileAsync("dataLog.txt");
+      if (sampleFile == null)
+      {
+        sampleFile =
+          await storageFolder.CreateFileAsync("dataLog.txt",
+              Windows.Storage.CreationCollisionOption.ReplaceExisting);
+      }
+      
+
+
+   
+      await Windows.Storage.FileIO.WriteTextAsync(sampleFile, data + System.DateTime.Now.ToString());
+      
+     
+    }
+
     private void DisconnectButton_Click(object sender, RoutedEventArgs e)
     {
       Disconnect("Disconnected");
@@ -591,6 +636,13 @@ namespace App4
       }
 
       // rootPage.NotifyUser(disconnectReason, NotifyType.StatusMessage);
+      buffer.Clear();
+      _dataAccelX.Clear();
+      _dataAccelY.Clear();
+      _dataAccelZ.Clear();
+      _dataAccelX.Add(0.0);
+      _dataAccelZ.Add(0.0);
+      _dataAccelY.Add(0.0);
       ResetMainUI();
     }
 

@@ -100,10 +100,10 @@ namespace blueTest
     private void ConnectionLost()
     {
       Message msg = MessageHandler.ObtainMessage(Constants.MESSAGE_TOAST);
-      Bundle bundle = new Bundle();
-      bundle.PutString(Constants.TOAST, "Device connection lost");
-      msg.Data = bundle;
-      MessageHandler.SendMessage(msg);
+     // Bundle bundle = new Bundle();
+     // bundle.PutString(Constants.TOAST, "Device connection lost");
+     // msg.Data = bundle;
+     // MessageHandler.SendMessage(msg);
       state = StateEnum.None;
       this.Start();
     }
@@ -120,6 +120,7 @@ namespace blueTest
 
       this.Start();
     }
+
 
     internal class AcceptThread
     {

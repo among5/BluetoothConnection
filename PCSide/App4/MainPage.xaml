@@ -107,10 +107,11 @@
                                 <TextBox x:Name="MessageTextBox" Grid.Column="0" Grid.Row="1" Margin="0,10,10,0"/>
 
                                 <TextBox x:Name="SensorText" Grid.Column="0" Grid.Row="1" Margin="0,10,10,0" />
-                                <canvas:CanvasControl
+                                <canvas:CanvasAnimatedControl
             x:Name="canvas"
             Margin="-25,69,-289,-700"
-         ClearColor="HotPink"
+         ClearColor="FloralWhite"
+                                  Update="Canvas_UpdateData"
             Draw="Canvas_OnDraw" Grid.Row="2" Grid.ColumnSpan="2" />
                                 <TextBlock
                     Text="Shift" />

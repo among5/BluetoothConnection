@@ -7,15 +7,16 @@ using Microsoft.Graphics.Canvas.Brushes;
 using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.Graphics.Canvas.Text;
 using Microsoft.Graphics.Canvas.UI.Xaml;
+using Windows.UI.Core;
 
 namespace App4
 {
   class ChartRenderer
   {
-    public void RenderAxes(CanvasControl canvas, CanvasDrawEventArgs args)
+    public void RenderAxes(CanvasAnimatedControl canvas, CanvasAnimatedDrawEventArgs args)
     {
-      var width = (float)canvas.ActualWidth;
-      var height = (float)(canvas.ActualHeight);
+      var width = (float)1100;
+      var height = (float)600;
       var midWidth = (float)(width * .5);
       var midHeight = (float)(height * .5);
 
@@ -36,7 +37,9 @@ namespace App4
       }
 
       args.DrawingSession.DrawText("0", 5, midHeight - 30, Colors.Gray);
-      args.DrawingSession.DrawText(canvas.ActualWidth.ToString(), width - 50, midHeight - 30, Colors.Gray);
+      string temp = null;
+      //var io = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => {canvas.Width.ToString(); }).GetResults();
+      args.DrawingSession.DrawText(width.ToString(), width - 50, midHeight - 30, Colors.Gray);
 
       using (var cpb = new CanvasPathBuilder(args.DrawingSession))
       {
@@ -58,7 +61,7 @@ namespace App4
       args.DrawingSession.DrawText("1", midWidth + 5, 5, Colors.Gray);
     }
 
-    public void RenderData(CanvasControl canvas, CanvasDrawEventArgs args, Color color, float thickness, List<double> data, int shift)
+    public void RenderData(CanvasAnimatedControl canvas, CanvasAnimatedDrawEventArgs args, Color color, float thickness, List<double> data, int shift)
     {
       using (var cpb = new CanvasPathBuilder(args.DrawingSession))
       {

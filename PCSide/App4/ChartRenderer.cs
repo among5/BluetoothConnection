@@ -37,8 +37,6 @@ namespace App4
       }
 
       args.DrawingSession.DrawText("0", 5, midHeight - 30, Colors.Gray);
-      string temp = null;
-      //var io = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => {canvas.Width.ToString(); }).GetResults();
       args.DrawingSession.DrawText(width.ToString(), width - 50, midHeight - 30, Colors.Gray);
 
       using (var cpb = new CanvasPathBuilder(args.DrawingSession))
@@ -65,17 +63,14 @@ namespace App4
     {
       using (var cpb = new CanvasPathBuilder(args.DrawingSession))
       {
-        cpb.BeginFigure(new Vector2(0, (float)((data[0]+shift)*10)));
-
-        for (int i = 1; i < data.Count; i++)
+        cpb.BeginFigure(new Vector2(0, (float)((data[shift]+32)*10)));
+        int width = data.Count < 1100 ? data.Count : 1100;
+        for (int i = 0; i < width; i++)
         {
-          cpb.AddLine(new Vector2(i, (float)(((data[i] * -1)+shift)*10)));
+          cpb.AddLine(new Vector2(i, (float)(((data[shift + i] * -1)+32)*10)));
         }
-
-      
           cpb.EndFigure(CanvasFigureLoop.Open);
           args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(cpb), color, thickness);
-        
       }
     }
 

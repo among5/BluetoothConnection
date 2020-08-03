@@ -4,8 +4,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.IO;
-using System.Xml.Linq;
+using System.Threading;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.Rfcomm;
 using Windows.Devices.Enumeration;
@@ -16,9 +15,7 @@ using Windows.UI;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
-using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media.Imaging;
-using WinRTXamlToolkit.Controls.DataVisualization.Charting;
 
 // The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -36,7 +33,6 @@ namespace App4
     private BluetoothDevice bluetoothDevice;
     private Queue<DataPoint> valueList;
     private Queue<DataPoint> gyrValueList;
-    private Stopwatch stopwatch;
 
 
     private const float DataStrokeThickness = 1;
@@ -51,73 +47,44 @@ namespace App4
 
     private readonly ChartRenderer _chartRenderer;
 
-    private DispatcherTimer dispatcherTimer;
-
-    private double[] values;
-    List<double> storage = new List<double>();
     private List<double> buffer;
     private readonly object bufferLock = new object();
-    private readonly object timerLock = new object();
-
-    private int counter;
 
     private byte[] storeInputData = new byte[39];
     public MainPage()
     {
       this.InitializeComponent();
       App.Current.Suspending += App_Suspending;
-      counter = 0;
       ResultCollection = new ObservableCollection<RfcommChatDeviceDisplay>();
       valueList = new Queue<DataPoint>();
       gyrValueList = new Queue<DataPoint>();
-     
-      stopwatch = new Stopwatch();
-      stopwatch.Start();
+
       //DispatcherTimerSetup();
       buffer = new List<double>();
       _chartRenderer = new ChartRenderer();
-      values = new double[9];
-     
-      DataContext = this;
-      counter = 0;
-
 
       _dataAccelX.Add(0.0);
       _dataAccelZ.Add(0.0);
       _dataAccelY.Add(0.0);
 
+      DataContext = this;
+
+
+
+
     }
-
-    /*
-    public void DispatcherTimerSetup()
-    {
-      dispatcherTimer = new DispatcherTimer();
-      dispatcherTimer.Tick += dispatchedTimer_Tick;
-
-      dispatcherTimer.Interval = TimeSpan.FromMilliseconds(100);
-      dispatcherTimer.Start();
-    }
-
-    public void dispatchedTimer_Tick(object sender, object e)
-    {
-      lock (timerLock) { 
-     // canvas.Invalidate();
-        }  
-    }
-    */
-
 
     public ObservableCollection<RfcommChatDeviceDisplay> ResultCollection
     {
       get;
       private set;
     }
-    
+
     private void StopWatcher()
     {
       if (null != deviceWatcher)
       {
-        if ((deviceWatcher.Status == DeviceWatcherStatus.Started||
+        if ((deviceWatcher.Status == DeviceWatcherStatus.Started ||
              deviceWatcher.Status == DeviceWatcherStatus.EnumerationCompleted))
         {
           deviceWatcher.Stop();
@@ -171,16 +138,7 @@ namespace App4
       // Re-set device specific UX
       ChatBox.Visibility = Visibility.Collapsed;
       RequestAccessButton.Visibility = Visibility.Collapsed;
-      stopwatch.Stop();
-      stopwatch.Reset();
-     // if (ConversationList.Items != null) ConversationList.Items.Clear();
-
-     // valueList.Clear();
-
       StopWatcher();
-
-
-
     }
 
     private void StartUnpairedDeviceWatcher()
@@ -227,7 +185,7 @@ namespace App4
       {
         await this.Dispatcher.RunAsync(CoreDispatcherPriority.Low, () =>
         {
-         NotifyUser(String.Format("{0} devices found. Enumeration completed. Watching for updates...", ResultCollection.Count));
+          NotifyUser(String.Format("{0} devices found. Enumeration completed. Watching for updates...", ResultCollection.Count));
         });
       });
 
@@ -270,17 +228,16 @@ namespace App4
     private async void ConnectButton_Click(object sender, RoutedEventArgs e)
     {
       // Make sure user has selected a device first
-      /*
       if (resultsListView.SelectedItem != null)
       {
-        rootPage.NotifyUser("Connecting to remote device. Please wait...", NotifyType.StatusMessage);
+        NotifyUser("Connecting to remote device. Please hold...");
       }
       else
       {
-        rootPage.NotifyUser("Please select an item to connect to", NotifyType.ErrorMessage);
+        NotifyUser("Please select an item to connect to");
         return;
       }
-      */
+
       RfcommChatDeviceDisplay deviceInfoDisp = resultsListView.SelectedItem as RfcommChatDeviceDisplay;
 
       // Perform device access checks before trying to get the device.
@@ -307,7 +264,7 @@ namespace App4
       // should not be interacted with.
       if (bluetoothDevice == null)
       {
-       NotifyUser("Bluetooth Device returned null. Access Status = " + accessStatus.ToString());
+        NotifyUser("Bluetooth Device returned null. Access Status = " + accessStatus.ToString());
       }
 
       // This should return a list of uncached Bluetooth services (so if the server was not active when paired, it will still be detected by this call
@@ -329,7 +286,7 @@ namespace App4
       var attributes = await chatService.GetSdpRawAttributesAsync();
       if (!attributes.ContainsKey(Constants.SdpServiceNameAttributeId))
       {
-        NotifyUser("The Chat service is not advertising the Service Name attribute (attribute id=0x100). " +"Please verify that you are running the BluetoothRfcommChat server.");
+        NotifyUser("The Chat service is not advertising the Service Name attribute (attribute id=0x100). " + "Please verify that you are running the BluetoothRfcommChat server.");
         ResetMainUI();
         return;
       }
@@ -337,7 +294,7 @@ namespace App4
       var attributeType = attributeReader.ReadByte();
       if (attributeType != Constants.SdpServiceNameAttributeType)
       {
-       NotifyUser("The Chat service is using an unexpected format for the Service Name attribute. " + "Please verify that you are running the BluetoothRfcommChat server.");
+        NotifyUser("The Chat service is using an unexpected format for the Service Name attribute. " + "Please verify that you are running the BluetoothRfcommChat server.");
         ResetMainUI();
         return;
       }
@@ -355,21 +312,23 @@ namespace App4
       try
       {
         await chatSocket.ConnectAsync(chatService.ConnectionHostName, chatService.ConnectionServiceName);
-
         SetChatUI(attributeReader.ReadString(serviceNameLength), bluetoothDevice.Name);
         chatWriter = new DataWriter(chatSocket.OutputStream);
-
-        DataReader chatReader = new DataReader(chatSocket.InputStream);
-        ReceiveStringLoop(chatReader);
+        Thread thread = new Thread(() =>
+        {
+          DataReader chatReader = new DataReader(chatSocket.InputStream);
+          ReceiveStringLoop(chatReader);
+        });
+        thread.Start();
       }
       catch (Exception ex) when ((uint)ex.HResult == 0x80070490) // ERROR_ELEMENT_NOT_FOUND
       {
-       NotifyUser("Please verify that you are running the BluetoothRfcommChat server.");
+        NotifyUser("Please verify that you are running the BluetoothRfcommChat server.");
         ResetMainUI();
       }
       catch (Exception ex) when ((uint)ex.HResult == 0x80072740) // WSAEADDRINUSE
       {
-       NotifyUser("Please verify that there is no other RFCOMM connection to the same device.");
+        NotifyUser("Please verify that there is no other RFCOMM connection to the same device.");
         ResetMainUI();
       }
     }
@@ -390,48 +349,11 @@ namespace App4
 
       if (accessStatus != DeviceAccessStatus.Allowed)
       {
-      NotifyUser("Access to the device is denied because the application was not granted access");
+        NotifyUser("Access to the device is denied because the application was not granted access");
       }
       else
       {
-      NotifyUser("Access granted, you are free to pair devices");
-      }
-    }
-    private void SendButton_Click(object sender, RoutedEventArgs e)
-    {
-      SendMessage();
-    }
-
-    public void KeyboardKey_Pressed(object sender, KeyRoutedEventArgs e)
-    {
-      if (e.Key == Windows.System.VirtualKey.Enter)
-      {
-        SendMessage();
-      }
-    }
-
-    /// <summary>
-    /// Takes the contents of the MessageTextBox and writes it to the outgoing chatWriter
-    /// </summary>
-    private async void SendMessage()
-    {
-      try
-      {
-        if (MessageTextBox.Text.Length != 0)
-        {
-          chatWriter.WriteUInt32((uint)MessageTextBox.Text.Length);
-          chatWriter.WriteString(MessageTextBox.Text);
-
-        //  ConversationList.Items.Add("Sent: " + MessageTextBox.Text);
-          MessageTextBox.Text = "";
-          await chatWriter.StoreAsync();
-
-        }
-      }
-      catch (Exception ex) when ((uint)ex.HResult == 0x80072745)
-      {
-        // The remote device has disconnected the connection
-      NotifyUser("Remote side disconnect: " + ex.HResult.ToString() + " - " + ex.Message);
+        NotifyUser("Access granted, you are free to pair devices");
       }
     }
 
@@ -442,63 +364,43 @@ namespace App4
     }
     private async void ReceiveStringLoop(DataReader chatReader)
     {
-
-       
- 
-        // Debug.WriteLine("Dequeued!");
-      
-     
       try
       {
-        uint size = await chatReader.LoadAsync(sizeof(uint));
-        if (size < sizeof(uint))
+        while (true)
         {
-          Disconnect("Remote device terminated connection - make sure only one instance of server is running on remote device");
-          return;
+          uint size = await chatReader.LoadAsync(sizeof(uint));
+          if (size < sizeof(uint))
+          {
+            Disconnect("Remote device terminated connection - make sure only one instance of server is running on remote device");
+            return;
+          }
+          uint stringLength = 39;
+          uint actualStringLength = await chatReader.LoadAsync(stringLength);
+
+          if (actualStringLength != stringLength)
+          {
+            // The underlying socket was closed before we were able to read the whole data
+            return;
+          }
+          chatReader.ReadBytes(storeInputData);
+          string store = "";
+          //Stores time
+          double AccelX = 0.0;
+          //Stores X value of Acceleration
+          double AccelY = 0.0;
+          double GyrX = 0.0;
+          double GyrY = 0.0;
+          lock (bufferLock)
+          {
+            for (int i = 0; i < 9; i++)
+            {
+              float curFloat = BitConverter.ToSingle(storeInputData, i * 4 + 3);
+              store = store + curFloat.ToString() + " ";
+              buffer.Add(Convert.ToDouble(BitConverter.ToSingle(storeInputData, i * 4 + 3)));
+            }
+          }
+          //SensorText.Text = store;
         }
-
-        // uint stringLength = chatReader.ReadUInt32();
-        uint stringLength = 39;
-        uint actualStringLength = await chatReader.LoadAsync(stringLength);
-
-        if (actualStringLength != stringLength)
-        {
-          // The underlying socket was closed before we were able to read the whole data
-          return;
-        }
-
-       
-       
-        chatReader.ReadBytes(storeInputData);
-        string store = "";
-        //Stores time
-        double AccelX = 0.0;
-        //Stores X value of Accleration
-        double AccelY = 0.0;
-        double GyrX = 0.0;
-        double GyrY = 0.0;
-        for (int i = 0; i < 9; i++)
-        {
-          float curFloat = BitConverter.ToSingle(storeInputData, i * 4 + 3);
-          store = store + curFloat.ToString() + " ";
-          buffer.Add(Convert.ToDouble(BitConverter.ToSingle(storeInputData, i * 4 + 3)));
-        }
-     
-       
-        
-          
-          canvas.Invalidate();
-
-        
-       
-        
-        // ConversationList.Items.Add("Accelerometer: " + text.Substring(3,4) + ", " + text.Substring(7,4) + ", " + text.Substring(11,4) + " Gyroscope: " + text.Substring(15,4) + ", " + text.Substring(19,4) + ", " + text.Substring(23,4));
-        // SensorText.Text = text;
-
-        //SensorText.Text = store;
-       // logData(store);
-       // Debug.WriteLine(store);
-        ReceiveStringLoop(chatReader);
       }
       catch (Exception ex)
       {
@@ -507,99 +409,54 @@ namespace App4
           if (chatSocket == null)
           {
             // Do not print anything here -  the user closed the socket.
-            //  if ((uint)ex.HResult == 0x80072745)
-            //     rootPage.NotifyUser("Disconnect triggered by remote device", NotifyType.StatusMessage);
-            //  else if ((uint)ex.HResult == 0x800703E3)
-            //     rootPage.NotifyUser("The I/O operation has been aborted because of either a thread exit or an application request.", NotifyType.StatusMessage);
+            if ((uint)ex.HResult == 0x80072745)
+              this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => { NotifyUser("Disconnect triggered by remote device"); }).GetAwaiter().GetResult();
+            else if ((uint)ex.HResult == 0x800703E3)
+              this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => { NotifyUser("The I/O operation has been aborted because of either a thread exit or an application request."); }).GetAwaiter().GetResult();
           }
           else
           {
-            Disconnect("Read stream failed with error: " + ex.Message);
+            this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => { Disconnect("Read stream failed with error: " + ex.Message); }).GetAwaiter().GetResult();
           }
         }
-      }
-
+      } 
     }
 
     private void Canvas_UpdateData(ICanvasAnimatedControl sender, CanvasAnimatedUpdateEventArgs args)
     {
+      if (args.Timing.IsRunningSlowly)
+      {
+        Debug.WriteLine("RUNNING SLOWLY");
+      }
       if (buffer.Count != 0)
       {
-
-        for (int i = 0; i < buffer.Count / 9; i = i + 9)
-        {
-          _dataAccelX.Add(buffer[i]);
-          _dataAccelY.Add(buffer[i + 1]);
-          _dataAccelZ.Add(buffer[i + 2]);
+        lock (bufferLock) {
+          Debug.WriteLine(buffer.Count);
+          for (int i = 0; i < buffer.Count / 9; i = i + 9)
+          {
+            _dataAccelX.Add(buffer[i]);
+            _dataAccelY.Add(buffer[i + 1]);
+            _dataAccelZ.Add(buffer[i + 2]);
+          }
+          buffer.Clear();
         }
-        buffer.Clear();
-
-
       }
-
     }
 
     private void Canvas_OnDraw(ICanvasAnimatedControl sender, CanvasAnimatedDrawEventArgs args)
     {
-      int startMilli = DateTime.Now.Millisecond;
       canvas.IsFixedTimeStep = false;
-
-
       int width = 1100;
       width = width - (width % 9) + 1;
-      if (_dataAccelX.Count > width)
+      int difference = 0;
+      if (_dataAccelX.Count > width + 1)
       {
-        _dataAccelX.RemoveRange(0, _dataAccelX.Count - width);
-        _dataAccelY.RemoveRange(0, _dataAccelY.Count - width);
-        _dataAccelZ.RemoveRange(0, _dataAccelZ.Count - width);
+        difference = _dataAccelX.Count - width - 1;
       }
-
-      //args.DrawingSession.Clear(Colors.FloralWhite);
-      _chartRenderer.RenderData(canvas, args, Colors.Black, DataStrokeThickness, _dataAccelX, 32);
-      _chartRenderer.RenderData(canvas, args, Colors.DarkGreen, DataStrokeThickness, _dataAccelY, 32);
-      _chartRenderer.RenderData(canvas, args, Colors.Blue, DataStrokeThickness, _dataAccelZ, 32);
-     
-      // _chartRenderer.RenderMovingAverage(canvas, args, Colors.DeepSkyBlue, DataStrokeThickness, 50, _dataAccelX);
+      _chartRenderer.RenderData(canvas, args, Colors.Black, DataStrokeThickness, _dataAccelX, difference);
+      _chartRenderer.RenderData(canvas, args, Colors.DarkGreen, DataStrokeThickness, _dataAccelY, difference);
+      _chartRenderer.RenderData(canvas, args, Colors.Blue, DataStrokeThickness, _dataAccelZ, difference);
       _chartRenderer.RenderAxes(canvas, args);
-      /*
-      if (values != null)
-      {
-        _data.Add(values[0]);
-      }
-      else
-      {
-        _data.Add(0.0);
-      }
-      */
-
-      int endMilli = DateTime.Now.Millisecond;
-      Debug.WriteLine(endMilli - startMilli);
-
-     
-
-      
-    }
-
-
-    private async void logData(string data)
-    {
-      Windows.Storage.StorageFolder storageFolder =
-    Windows.Storage.ApplicationData.Current.TemporaryFolder;
-      Windows.Storage.StorageFile sampleFile =
-    await storageFolder.GetFileAsync("dataLog.txt");
-      if (sampleFile == null)
-      {
-        sampleFile =
-          await storageFolder.CreateFileAsync("dataLog.txt",
-              Windows.Storage.CreationCollisionOption.ReplaceExisting);
-      }
-      
-
-
-   
-      await Windows.Storage.FileIO.WriteTextAsync(sampleFile, data + System.DateTime.Now.ToString());
-      
-     
     }
 
     private void DisconnectButton_Click(object sender, RoutedEventArgs e)
@@ -607,7 +464,6 @@ namespace App4
       Disconnect("Disconnected");
     }
 
-    
     /// <summary>
     /// Cleans up the socket and DataWriter and reset the UI
     /// </summary>
@@ -620,12 +476,12 @@ namespace App4
         chatWriter = null;
       }
 
-
       if (chatService != null)
       {
         chatService.Dispose();
         chatService = null;
       }
+
       lock (this)
       {
         if (chatSocket != null)
@@ -635,7 +491,7 @@ namespace App4
         }
       }
 
-      // rootPage.NotifyUser(disconnectReason, NotifyType.StatusMessage);
+      NotifyUser(disconnectReason);
       buffer.Clear();
       _dataAccelX.Clear();
       _dataAccelY.Clear();
@@ -648,7 +504,7 @@ namespace App4
 
     private void SetChatUI(string serviceName, string deviceName)
     {
-      // rootPage.NotifyUser("Connected", NotifyType.StatusMessage);
+      NotifyUser("Connected");
       ServiceName.Text = "Service Name: " + serviceName;
       DeviceName.Text = "Connected to: " + deviceName;
       RunButton.IsEnabled = false;
@@ -658,12 +514,6 @@ namespace App4
       resultsListView.Visibility = Visibility.Collapsed;
       ChatBox.Visibility = Visibility.Visible;
       NotificationBox.Visibility = Visibility.Collapsed;
-      stopwatch.Start();
-
-
-     
-
-     
     }
 
     private void ResultsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -674,7 +524,6 @@ namespace App4
     private void UpdatePairingButtons()
     {
       RfcommChatDeviceDisplay deviceDisp = (RfcommChatDeviceDisplay)resultsListView.SelectedItem;
-
       if (null != deviceDisp)
       {
         ConnectButton.IsEnabled = true;
@@ -687,7 +536,6 @@ namespace App4
 
     private void ScrollViewer_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
     {
-
     }
   }
 

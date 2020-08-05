@@ -97,6 +97,7 @@ namespace InertialSensor.Desktop
       {
         SetDeviceWatcherUI();
         StartUnpairedDeviceWatcher();
+        ConnectButton.IsEnabled = true;
       }
       else
       {
@@ -120,10 +121,9 @@ namespace InertialSensor.Desktop
       ConnectButton.Visibility = Visibility.Visible;
       resultsListView.Visibility = Visibility.Visible;
       resultsListView.IsEnabled = true;
-
+      ConnectButton.IsEnabled = false;
       // Re-set device specific UX
       ChatBox.Visibility = Visibility.Collapsed;
-      RequestAccessButton.Visibility = Visibility.Collapsed;
       StopWatcher();
     }
 
@@ -498,11 +498,9 @@ namespace InertialSensor.Desktop
     private void SetChatUI(string serviceName, string deviceName)
     {
       NotifyUser("Connected");
-      ServiceName.Text = "Service Name: " + serviceName;
       DeviceName.Text = "Connected to: " + deviceName;
       RunButton.IsEnabled = false;
       ConnectButton.Visibility = Visibility.Collapsed;
-      RequestAccessButton.Visibility = Visibility.Visible;
       resultsListView.IsEnabled = false;
       resultsListView.Visibility = Visibility.Collapsed;
       ChatBox.Visibility = Visibility.Visible;
@@ -529,6 +527,11 @@ namespace InertialSensor.Desktop
 
     private void ScrollViewer_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
     {
+    }
+
+    private void Notification_SelectionChanged(object sender, RoutedEventArgs e)
+    {
+
     }
   }
 

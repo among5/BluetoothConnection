@@ -4,14 +4,12 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.IO;
 using System.Threading;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.Rfcomm;
 using Windows.Devices.Enumeration;
 using Windows.Foundation;
 using Windows.Networking.Sockets;
-using Windows.Storage;
 using Windows.Storage.Streams;
 using Windows.UI;
 using Windows.UI.Core;
@@ -33,33 +31,18 @@ namespace App4
     private DataWriter chatWriter;
     private RfcommDeviceService chatService;
     private BluetoothDevice bluetoothDevice;
-    private Queue<DataPoint> valueList;
-    private Queue<DataPoint> gyrValueList;
-
 
     private const float DataStrokeThickness = 1;
     private readonly List<XYZ> Acceleration = new List<XYZ>();
+    private readonly List<XYZ> accelerationTemp = new List<XYZ>();
 
-    private readonly List<double> _dataGyrX = new List<double>();
-    private readonly List<double> _dataGyrY = new List<double>();
-    private readonly List<double> _dataGyrZ = new List<double>();
-
-
-    private readonly List<double> AccelX = new List<double>();
-    private readonly List<double> AccelY = new List<double>();
-    private readonly List<double> AccelZ = new List<double>();
-
-    //private int shift => (int)ShiftSlider.Value;
-    private StorageFile sampleFile;
     private readonly ChartRenderer _chartRenderer;
 
     private Boolean saveToFile;
-    private int counter;
     private List<double> buffer;
     private readonly object bufferLock = new object();
 
     private byte[] storeInputData = new byte[39];
-    private long average;
     private Logger logger;
     private Stopwatch st;
     public MainPage()
@@ -67,25 +50,12 @@ namespace App4
       this.InitializeComponent();
       App.Current.Suspending += App_Suspending;
       ResultCollection = new ObservableCollection<RfcommChatDeviceDisplay>();
-      valueList = new Queue<DataPoint>();
-      gyrValueList = new Queue<DataPoint>();
-
-      //DispatcherTimerSetup();
-      buffer = new List<double>();
       _chartRenderer = new ChartRenderer();
-
-      Acceleration.Add(new XYZ(0.0,0.0,0.0));
-
-      logger = new Logger("dataLog.txt");
-     st = new Stopwatch();
-      counter = 0;
+      Acceleration.Add(new XYZ(0.0, 0.0, 0.0));
+      // logger = new Logger("dataLog.txt");
+      //st = new Stopwatch();
       canvas.TargetElapsedTime = TimeSpan.FromMilliseconds(100);
-      average = 0;
       DataContext = this;
-
-
-
-
     }
 
     public ObservableCollection<RfcommChatDeviceDisplay> ResultCollection
@@ -98,8 +68,8 @@ namespace App4
     {
       if (null != deviceWatcher)
       {
-        if ((deviceWatcher.Status == DeviceWatcherStatus.Started ||
-             deviceWatcher.Status == DeviceWatcherStatus.EnumerationCompleted))
+        if (deviceWatcher.Status == DeviceWatcherStatus.Started ||
+             deviceWatcher.Status == DeviceWatcherStatus.EnumerationCompleted)
         {
           deviceWatcher.Stop();
         }
@@ -174,7 +144,7 @@ namespace App4
           if (deviceInfo.Name != "")
           {
             ResultCollection.Add(new RfcommChatDeviceDisplay(deviceInfo));
-            NotifyUser(String.Format("{0} devices found.", ResultCollection.Count));
+            NotifyUser(string.Format("{0} devices found.", ResultCollection.Count));
           }
 
         });
@@ -217,8 +187,6 @@ namespace App4
               break;
             }
           }
-
-
         });
       });
 
@@ -259,20 +227,20 @@ namespace App4
       DeviceAccessStatus accessStatus = DeviceAccessInformation.CreateFromId(deviceInfoDisp.Id).CurrentStatus;
       if (accessStatus == DeviceAccessStatus.DeniedByUser)
       {
-
         return;
       }
+
       // If not, try to get the Bluetooth device
       try
       {
         bluetoothDevice = await BluetoothDevice.FromIdAsync(deviceInfoDisp.Id);
       }
-      catch (Exception ex)
+      catch
       {
-
         ResetMainUI();
         return;
       }
+
       // If we were unable to get a valid Bluetooth device object,
       // it's most likely because the user has specified that all unpaired devices
       // should not be interacted with.
@@ -371,7 +339,6 @@ namespace App4
     {
       // Make sure user has given consent to access device
       DeviceAccessStatus accessStatus = await bluetoothDevice.RequestAccessAsync();
-
       if (accessStatus != DeviceAccessStatus.Allowed)
       {
         NotifyUser("Access to the device is denied because the application was not granted access");
@@ -394,12 +361,6 @@ namespace App4
         while (true)
         {
           //st.Restart();
-          //uint size = await chatReader.LoadAsync(sizeof(uint));
-          //if (size < sizeof(uint))
-          //{
-          //  Disconnect("Remote device terminated connection - make sure only one instance of server is running on remote device");
-          //  return;
-          //}
           uint actualStringLength = await chatReader.LoadAsync(43);
           if (actualStringLength < 43)
           {
@@ -407,30 +368,18 @@ namespace App4
             return;
           }
           chatReader.ReadBytes(storeInputData);
-          //counter++;
-
-          string store = "";
+         // string store = "";
           var bufferTemp = new List<double>();
-          
-          for (int i = 0; i < 9; i++){
+          for (int i = 0; i < 3; i++){
             // float curFloat = BitConverter.ToSingle(storeInputData, i * 4 + 3);
             // store = store + curFloat.ToString() + " ";
-
-            bufferTemp.Add(Convert.ToDouble(BitConverter.ToSingle(storeInputData, i * 4 + 3)));
-      
-            
+            bufferTemp.Add(BitConverter.ToSingle(storeInputData, i * 4 + 3));    
           }
-
 
           // Lock to copy over the data
           lock (bufferLock)
           {
-            
-            AccelX.Add(bufferTemp[0]);
-            AccelY.Add(bufferTemp[1]);
-            AccelZ.Add(bufferTemp[2]);
-            
-           // buffer.AddRange(bufferTemp);
+            accelerationTemp.Add(new XYZ(bufferTemp[0], bufferTemp[1], bufferTemp[2]));            
           }
 /*
           if (saveToFile)
@@ -440,7 +389,6 @@ namespace App4
           */
           //st.Stop();
           //Debug.WriteLine(st.ElapsedTicks);
-
           //SensorText.Text = store;
         }
       }
@@ -467,53 +415,36 @@ namespace App4
    
     private void Canvas_UpdateData(ICanvasAnimatedControl sender, CanvasAnimatedUpdateEventArgs args)
     {
-     /*
-      if (args.Timing.IsRunningSlowly)
-      {
-        Debug.WriteLine("RUNNING SLOWLY");
-      }
-      */
      // st.Restart();
-      if (AccelX.Count != 0)
+      if (accelerationTemp.Count != 0)
       {
-      //  var tempBuffer = new List<Double>();
-        lock (bufferLock) {
-        //  tempBuffer.AddRange(buffer);
-         for(int i = 0; i<AccelX.Count; i++)
-          {
-            Acceleration.Add(new XYZ(AccelX[i], AccelY[i], AccelZ[i]));
-          }
-          AccelX.Clear();
-          AccelY.Clear();
-          AccelZ.Clear();
+        lock (bufferLock)
+        {
+          Acceleration.AddRange(accelerationTemp);
+          accelerationTemp.Clear();
         }
          /* 
         st.Stop();
         counter++;
         average = (average + st.ElapsedTicks);
-        Debug.WriteLine(average/counter + " " + st.ElapsedTicks);*/
-        
-        
+        Debug.WriteLine(average/counter + " " + st.ElapsedTicks);*/  
       }
     }
 
     private void Canvas_OnDraw(ICanvasAnimatedControl sender, CanvasAnimatedDrawEventArgs args)
     {
-      
-     // st.Restart();
-    canvas.IsFixedTimeStep = false;
+      // st.Restart();
+      canvas.IsFixedTimeStep = false;
       int width = 999;
       if (Acceleration.Count > width)
       {
         Acceleration.RemoveRange(0, Acceleration.Count - width);
       }
+
       _chartRenderer.RenderData(canvas, args, Colors.Black, DataStrokeThickness, Acceleration);
-    //  _chartRenderer.RenderData(canvas, args, Colors.DarkGreen, DataStrokeThickness, _dataAccelY, difference);
-    //  _chartRenderer.RenderData(canvas, args, Colors.Blue, DataStrokeThickness, _dataAccelZ, difference);
       _chartRenderer.RenderAxes(canvas, args);
-    //  st.Stop();
-     // Debug.WriteLine(st.ElapsedTicks + "!");
-     
+      // st.Stop();
+      // Debug.WriteLine(st.ElapsedTicks + "!");
     }
 
     private void DisconnectButton_Click(object sender, RoutedEventArgs e)
@@ -549,7 +480,6 @@ namespace App4
       }
 
       NotifyUser(disconnectReason);
-      buffer.Clear();
       Acceleration.Clear();
       Acceleration.Add(new XYZ(0.0, 0.0, 0.0));
       ResetMainUI();

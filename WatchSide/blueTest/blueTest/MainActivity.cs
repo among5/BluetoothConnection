@@ -349,7 +349,7 @@ namespace blueTest
       
       if(curSec != current)
       {
-        Console.WriteLine(counter + DateTime.Now.ToString());
+      //  Console.WriteLine(counter + DateTime.Now.ToString());
        // Console.WriteLine(sensorChangecounter + "*");
         sensorChangecounter = 0;
         current = curSec;

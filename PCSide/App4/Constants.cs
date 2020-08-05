@@ -22,5 +22,9 @@ namespace App4
 
     // The value of the Service Name SDP attribute
     public const string SdpServiceName = "Bluetooth Rfcomm Chat Service";
+
+    public const int ChartWidth = 999;
+
+    public const int ChartHeight = 600;
   }
 }

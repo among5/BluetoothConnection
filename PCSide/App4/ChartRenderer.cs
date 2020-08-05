@@ -15,8 +15,8 @@ namespace App4
   {
     public void RenderAxes(CanvasAnimatedControl canvas, CanvasAnimatedDrawEventArgs args)
     {
-      var width = (float)1100;
-      var height = (float)600;
+      var width = Constants.ChartWidth;
+      var height = Constants.ChartHeight;
       var midWidth = (float)(width * .5);
       var midHeight = (float)(height * .5);
 
@@ -63,15 +63,15 @@ namespace App4
     {
       using (var cpb = new CanvasPathBuilder(args.DrawingSession))
       {
-        using(var dataSet2 = new CanvasPathBuilder(args.DrawingSession))
+        using (var dataSet2 = new CanvasPathBuilder(args.DrawingSession))
         {
-          using(var dataSet3 = new CanvasPathBuilder(args.DrawingSession))
+          using (var dataSet3 = new CanvasPathBuilder(args.DrawingSession))
           {
             XYZ firstVal = data[0];
             cpb.BeginFigure(new Vector2(0, (float)((firstVal.X + 32) * 10)));
             dataSet2.BeginFigure(new Vector2(0, (float)((firstVal.Y + 32) * 10)));
             dataSet3.BeginFigure(new Vector2(0, (float)((firstVal.Z + 32) * 10)));
-            int width = data.Count < 1000 ? data.Count : 1000;
+            int width = data.Count < Constants.ChartWidth ? data.Count : Constants.ChartWidth;
             for (int i = 0; i < width; i++)
             {
               XYZ val = data[i];
@@ -87,11 +87,7 @@ namespace App4
             args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(dataSet3), Colors.PaleVioletRed, thickness);
           }
         }
-        
       }
     }
-
-   
-   
   }
 }

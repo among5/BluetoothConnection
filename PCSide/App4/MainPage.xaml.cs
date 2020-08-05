@@ -16,6 +16,7 @@ using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media.Imaging;
+using InertialSensor.Common;
 
 // The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -42,9 +43,10 @@ namespace App4
     private List<double> buffer;
     private readonly object bufferLock = new object();
 
-    private byte[] storeInputData = new byte[39];
+    private byte[] storeInputData = new byte[BluetoothConstants.BluetoothPackage];
     private Logger logger;
     private Stopwatch st;
+
     public MainPage()
     {
       this.InitializeComponent();
@@ -361,25 +363,33 @@ namespace App4
         while (true)
         {
           //st.Restart();
-          uint actualStringLength = await chatReader.LoadAsync(43);
-          if (actualStringLength < 43)
+          uint actualStringLength = await chatReader.LoadAsync(BluetoothConstants.BluetoothPackage);
+          if (actualStringLength < BluetoothConstants.BluetoothPackage)
           {
             Disconnect("Remote device terminated connection - make sure only one instance of server is running on remote device");
             return;
           }
           chatReader.ReadBytes(storeInputData);
+
          // string store = "";
           var bufferTemp = new List<double>();
-          for (int i = 0; i < 3; i++){
-            // float curFloat = BitConverter.ToSingle(storeInputData, i * 4 + 3);
-            // store = store + curFloat.ToString() + " ";
-            bufferTemp.Add(BitConverter.ToSingle(storeInputData, i * 4 + 3));    
+          var temp = new List<XYZ>();
+          for(int j =0; j< storeInputData.Length; j += BluetoothConstants.SingleDataPoint) {
+            for (int i = 0; i < 3; i++)
+            {
+              // float curFloat = BitConverter.ToSingle(storeInputData, i * 4 + 3);
+              // store = store + curFloat.ToString() + " ";
+              bufferTemp.Add(BitConverter.ToSingle(storeInputData, i * 4 + 3));
+            }
+            temp.Add(new XYZ(bufferTemp[0], bufferTemp[1], bufferTemp[2]));
           }
+          
 
           // Lock to copy over the data
           lock (bufferLock)
           {
-            accelerationTemp.Add(new XYZ(bufferTemp[0], bufferTemp[1], bufferTemp[2]));            
+           
+            accelerationTemp.AddRange(temp);            
           }
 /*
           if (saveToFile)
@@ -435,7 +445,7 @@ namespace App4
     {
       // st.Restart();
       canvas.IsFixedTimeStep = false;
-      int width = 999;
+      int width = Constants.ChartWidth;
       if (Acceleration.Count > width)
       {
         Acceleration.RemoveRange(0, Acceleration.Count - width);

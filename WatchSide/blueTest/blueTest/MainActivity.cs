@@ -32,6 +32,9 @@ namespace blueTest
     private int current;
     private int sensorChangecounter;
 
+    private byte[] dataPack; 
+
+
     private float[] sensorData;
     protected override void OnCreate(Bundle bundle)
     {
@@ -49,7 +52,7 @@ namespace blueTest
       vibrator = (Vibrator)GetSystemService(VibratorService);
 
       package = new byte[39];
-      package = new byte[39];
+
       for(int i=0; i<package.Length; i++)
       {
         package[i] = 0;
@@ -58,11 +61,12 @@ namespace blueTest
       package[1] = Convert.ToByte('A');
       package[2] = Convert.ToByte('P');
 
-      counter = 0;
+      counter = -1;
       sensorChangecounter = 0;
       current = DateTime.Now.Second;
       sensorData = new float[4];
 
+      dataPack = new byte[390];
       if (sensor_manager.GetDefaultSensor(SensorType.Accelerometer) != null)
       {
         vibrator.Vibrate(500);
@@ -77,7 +81,7 @@ namespace blueTest
 
     public void OnSensorChanged(SensorEvent e)
     {
-      sensorChangecounter++;
+      counter++;
       e.Values.CopyTo(sensorData, 0);
       //Updates package of bytes based on which sensor updated and sends over new data
       // through bluetooth
@@ -154,7 +158,13 @@ namespace blueTest
               package[i] = accelZ[i - 11];
             }
           }
-          SendMessage(package);
+          package.CopyTo(dataPack, counter * 39);
+          if(counter == 9)
+          {
+            SendMessage(dataPack);
+            counter = -1;
+          }
+       
           break;
 
         case SensorType.Gyroscope:
@@ -225,7 +235,12 @@ namespace blueTest
               package[i] = gyrZ[i - 23];
             }
           }
-          SendMessage(package);
+          package.CopyTo(dataPack, counter * 39);
+          if (counter == 9)
+          {
+            SendMessage(dataPack);
+            counter = -1;
+          }
           break;
         default:
           throw new Exception("Unhandled Sensor type");
@@ -362,9 +377,9 @@ namespace blueTest
         return;
       }
 
-      if(message.Length != 39)
+      if(message.Length != 390)
       {
-        throw new ArgumentException("Length != 39");
+        throw new ArgumentException("Length != 390");
       }   
 
       messageChatService.Write(message);

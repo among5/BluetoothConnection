@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="1" android:versionName="1.0" package="InertialSensor.Watch">
+  <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="28" />
+  <uses-feature android:name="android.hardware.type.watch" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+  <uses-permission android:name="android.permission.BLUETOOTH" />
+  <uses-permission android:name="android.permission.VIBRATE"/>
+  <uses-permission android:name="android.permission.BLUETOOTH" android:label="BLUETOOTH" />
+  <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+
+
+
+
+    <android:DeviceCapability Name="bluetooth.rfcomm">
+      
+    </android:DeviceCapability>
+  
+
+
+    <application
+    android:allowBackup="true"
+    android:icon="@mipmap/ic_launcher"
+    android:label="@string/app_name"
+    android:supportsRtl="true"
+    android:theme="@android:style/Theme.DeviceDefault">
+
+    <activity
+      android:name="md5284bf37f4ba39a1ccc30344e24591d91.BluetoothActivity"
+    />
+      
+    <uses-library
+      android:name="com.google.android.wearable"
+      android:required="true" />
+    <!--
+      Set to true if your app is Standalone, that is, it does not require the handheld
+      app to run.
+    -->
+    <meta-data
+      android:name="com.google.android.wearable.standalone"
+      android:value="true" />
+  </application>
+</manifest>

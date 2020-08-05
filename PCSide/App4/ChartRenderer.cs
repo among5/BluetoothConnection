@@ -59,154 +59,39 @@ namespace App4
       args.DrawingSession.DrawText("1", midWidth + 5, 5, Colors.Gray);
     }
 
-    public void RenderData(CanvasAnimatedControl canvas, CanvasAnimatedDrawEventArgs args, Color color, float thickness, List<double> data, int shift)
+    public void RenderData(CanvasAnimatedControl canvas, CanvasAnimatedDrawEventArgs args, Color color, float thickness, List<XYZ> data)
     {
       using (var cpb = new CanvasPathBuilder(args.DrawingSession))
       {
-        cpb.BeginFigure(new Vector2(0, (float)((data[shift]+32)*10)));
-        int width = data.Count < 1100 ? data.Count : 1100;
-        for (int i = 0; i < width; i++)
+        using(var dataSet2 = new CanvasPathBuilder(args.DrawingSession))
         {
-          cpb.AddLine(new Vector2(i, (float)(((data[shift + i] * -1)+32)*10)));
-        }
-          cpb.EndFigure(CanvasFigureLoop.Open);
-          args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(cpb), color, thickness);
-      }
-    }
-
-    public void RenderAveragesAsColumns(CanvasControl canvas, CanvasDrawEventArgs args, int columnAvgDataRange, float columnWidth, List<double> data)
-    {
-      var padding = .5 * (columnAvgDataRange - columnWidth);
-      for (int start = 0; start < data.Count; start += columnAvgDataRange)
-      {
-        double total = 0;
-        var range = Math.Min(columnAvgDataRange, data.Count - start);
-
-        for (int i = start; i < start + range; i++)
-        {
-          total += data[i];
-        }
-
-        args.DrawingSession.FillRectangle(
-            start + (float)padding,
-            (float)(canvas.ActualHeight * (1 - total / range)),
-            columnWidth,
-            (float)(canvas.ActualHeight * (total / range)),
-            Colors.WhiteSmoke);
-      }
-    }
-
-    public void RenderAveragesAsPieChart(CanvasControl canvas, CanvasDrawEventArgs args, List<double> pieValues, List<Color> palette)
-    {
-      var total = pieValues.Sum();
-
-      var w = (float)canvas.ActualWidth;
-      var h = (float)canvas.ActualHeight;
-      var midx = w / 2;
-      var midy = h / 2;
-      var padding = 50;
-      var lineOffset = 20;
-      var r = Math.Min(w, h) / 2 - padding;
-
-      float angle = 0f;
-      var center = new Vector2(midx, midy);
-
-      for (int i = 0; i < pieValues.Count; i++)
-      {
-        float sweepAngle = (float)(2 * Math.PI * pieValues[i] / total);
-        var arcStartPoint = new Vector2((float)(midx + r * Math.Sin(angle)), (float)(midy - r * Math.Cos(angle)));
-
-        using (var cpb = new CanvasPathBuilder(args.DrawingSession))
-        {
-          cpb.BeginFigure(center);
-          cpb.AddLine(arcStartPoint);
-          cpb.AddArc(new Vector2(midx, midy), r, r, angle - (float)(Math.PI / 2), sweepAngle);
-          cpb.EndFigure(CanvasFigureLoop.Closed);
-          args.DrawingSession.FillGeometry(CanvasGeometry.CreatePath(cpb), palette[i % palette.Count]);
-        }
-
-        angle += sweepAngle;
-      }
-
-      angle = 0f;
-
-      var lineBrush = new CanvasSolidColorBrush(args.DrawingSession, Colors.Black);
-
-      for (int i = 0; i < pieValues.Count; i++)
-      {
-        float sweepAngle = (float)(2 * Math.PI * pieValues[i] / total);
-        var midAngle = angle + sweepAngle / 2;
-        var isRightHalf = midAngle < Math.PI;
-        var isTopHalf = midAngle <= Math.PI / 2 || midAngle >= Math.PI * 3 / 2;
-        var p0 = new Vector2((float)(midx + (r - lineOffset) * Math.Sin(midAngle)), (float)(midy - (r - lineOffset) * Math.Cos(midAngle)));
-        var p1 = new Vector2((float)(midx + (r + lineOffset) * Math.Sin(midAngle)), (float)(midy - (r + lineOffset) * Math.Cos(midAngle)));
-        var p2 = isRightHalf ? new Vector2(p1.X + 50, p1.Y) : new Vector2(p1.X - 50, p1.Y);
-
-        using (var cpb = new CanvasPathBuilder(args.DrawingSession))
-        {
-          cpb.BeginFigure(p0);
-          cpb.AddLine(p1);
-          cpb.AddLine(p2);
-          cpb.EndFigure(CanvasFigureLoop.Open);
-
-          args.DrawingSession.DrawGeometry(
-              CanvasGeometry.CreatePath(cpb),
-              lineBrush,
-              1);
-        }
-
-        args.DrawingSession.DrawText(
-            pieValues[i].ToString("F2"),
-            p1,
-            Colors.Black,
-            new CanvasTextFormat
+          using(var dataSet3 = new CanvasPathBuilder(args.DrawingSession))
+          {
+            XYZ firstVal = data[0];
+            cpb.BeginFigure(new Vector2(0, (float)((firstVal.X + 32) * 10)));
+            dataSet2.BeginFigure(new Vector2(0, (float)((firstVal.Y + 32) * 10)));
+            dataSet3.BeginFigure(new Vector2(0, (float)((firstVal.Z + 32) * 10)));
+            int width = data.Count < 1000 ? data.Count : 1000;
+            for (int i = 0; i < width; i++)
             {
-              HorizontalAlignment = isRightHalf ? CanvasHorizontalAlignment.Left : CanvasHorizontalAlignment.Right,
-              VerticalAlignment = isTopHalf ? CanvasVerticalAlignment.Bottom : CanvasVerticalAlignment.Top,
-              FontSize = 18
-            });
-
-        angle += sweepAngle;
-      }
-    }
-
-    public void RenderMovingAverage(CanvasControl canvas, CanvasDrawEventArgs args, Color color, float thickness, int movingAverageRange, List<double> data)
-    {
-      using (var cpb = new CanvasPathBuilder(args.DrawingSession))
-      {
-        cpb.BeginFigure(new Vector2(0, (float)(canvas.ActualHeight * (1 - data[0]))));
-
-        double total = data[0];
-
-        int previousRangeLeft = 0;
-        int previousRangeRight = 0;
-
-        for (int i = 1; i < data.Count; i++)
-        {
-          var range = Math.Max(0, Math.Min(movingAverageRange / 2, Math.Min(i, data.Count - 1 - i)));
-          int rangeLeft = i - range;
-          int rangeRight = i + range;
-
-          for (int j = previousRangeLeft; j < rangeLeft; j++)
-          {
-            total -= data[j];
+              XYZ val = data[i];
+              cpb.AddLine(new Vector2(i, (float)(((val.X * -1) + 32) * 10)));
+              dataSet2.AddLine(new Vector2(i, (float)(((val.Y * -1) + 32) * 10)));
+              dataSet3.AddLine(new Vector2(i, (float)(((val.Z * -1) + 32) * 10)));
+            }
+            cpb.EndFigure(CanvasFigureLoop.Open);
+            dataSet2.EndFigure(CanvasFigureLoop.Open);
+            dataSet3.EndFigure(CanvasFigureLoop.Open);
+            args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(cpb), Colors.Black, thickness);
+            args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(dataSet2), Colors.Fuchsia, thickness);
+            args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(dataSet3), Colors.PaleVioletRed, thickness);
           }
-
-          for (int j = previousRangeRight + 1; j <= rangeRight; j++)
-          {
-            total += data[j];
-          }
-
-          previousRangeLeft = rangeLeft;
-          previousRangeRight = rangeRight;
-
-          cpb.AddLine(new Vector2(i, (float)(canvas.ActualHeight * (1 - total / (range * 2 + 1)))));
         }
-
-        cpb.EndFigure(CanvasFigureLoop.Open);
-
-        args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(cpb), color, thickness);
+        
       }
     }
+
+   
+   
   }
 }

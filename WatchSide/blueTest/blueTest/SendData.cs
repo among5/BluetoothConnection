@@ -249,7 +249,7 @@ namespace blueTest
         try
         {
           mmOutStream.Write(buffer);
-          Console.WriteLine(Encoding.UTF8.GetString(buffer));
+         // Console.WriteLine(Encoding.UTF8.GetString(buffer));
           sd.MessageHandler.ObtainMessage(Constants.MESSAGE_WRITE, -1, -1, buffer).SendToTarget();
         }
         catch (Exception e)

@@ -122,10 +122,12 @@
     <Compile Include="ChartRenderer.cs" />
     <Compile Include="Constants.cs" />
     <Compile Include="DataPoint.cs" />
+    <Compile Include="Logger.cs" />
     <Compile Include="MainPage.xaml.cs">
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="XYZ.cs" />
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">

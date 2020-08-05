@@ -4,12 +4,14 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.Rfcomm;
 using Windows.Devices.Enumeration;
 using Windows.Foundation;
 using Windows.Networking.Sockets;
+using Windows.Storage;
 using Windows.Storage.Streams;
 using Windows.UI;
 using Windows.UI.Core;
@@ -36,21 +38,30 @@ namespace App4
 
 
     private const float DataStrokeThickness = 1;
+    private readonly List<XYZ> Acceleration = new List<XYZ>();
 
-    private readonly List<double> _dataAccelX = new List<double>();
-    private readonly List<double> _dataAccelY = new List<double>();
-    private readonly List<double> _dataAccelZ = new List<double>();
     private readonly List<double> _dataGyrX = new List<double>();
     private readonly List<double> _dataGyrY = new List<double>();
     private readonly List<double> _dataGyrZ = new List<double>();
-    //private int shift => (int)ShiftSlider.Value;
 
+
+    private readonly List<double> AccelX = new List<double>();
+    private readonly List<double> AccelY = new List<double>();
+    private readonly List<double> AccelZ = new List<double>();
+
+    //private int shift => (int)ShiftSlider.Value;
+    private StorageFile sampleFile;
     private readonly ChartRenderer _chartRenderer;
 
+    private Boolean saveToFile;
+    private int counter;
     private List<double> buffer;
     private readonly object bufferLock = new object();
 
     private byte[] storeInputData = new byte[39];
+    private long average;
+    private Logger logger;
+    private Stopwatch st;
     public MainPage()
     {
       this.InitializeComponent();
@@ -63,10 +74,13 @@ namespace App4
       buffer = new List<double>();
       _chartRenderer = new ChartRenderer();
 
-      _dataAccelX.Add(0.0);
-      _dataAccelZ.Add(0.0);
-      _dataAccelY.Add(0.0);
+      Acceleration.Add(new XYZ(0.0,0.0,0.0));
 
+      logger = new Logger("dataLog.txt");
+     st = new Stopwatch();
+      counter = 0;
+      canvas.TargetElapsedTime = TimeSpan.FromMilliseconds(100);
+      average = 0;
       DataContext = this;
 
 
@@ -313,6 +327,17 @@ namespace App4
       {
         await chatSocket.ConnectAsync(chatService.ConnectionHostName, chatService.ConnectionServiceName);
         SetChatUI(attributeReader.ReadString(serviceNameLength), bluetoothDevice.Name);
+
+        if (checkBox.IsChecked == true)
+        {
+          saveToFile = true;
+         
+        }
+        else
+        {
+          saveToFile = false;
+        }
+
         chatWriter = new DataWriter(chatSocket.OutputStream);
         Thread thread = new Thread(() =>
         {
@@ -368,37 +393,54 @@ namespace App4
       {
         while (true)
         {
-          uint size = await chatReader.LoadAsync(sizeof(uint));
-          if (size < sizeof(uint))
+          //st.Restart();
+          //uint size = await chatReader.LoadAsync(sizeof(uint));
+          //if (size < sizeof(uint))
+          //{
+          //  Disconnect("Remote device terminated connection - make sure only one instance of server is running on remote device");
+          //  return;
+          //}
+          uint actualStringLength = await chatReader.LoadAsync(43);
+          if (actualStringLength < 43)
           {
             Disconnect("Remote device terminated connection - make sure only one instance of server is running on remote device");
             return;
           }
-          uint stringLength = 39;
-          uint actualStringLength = await chatReader.LoadAsync(stringLength);
-
-          if (actualStringLength != stringLength)
-          {
-            // The underlying socket was closed before we were able to read the whole data
-            return;
-          }
           chatReader.ReadBytes(storeInputData);
+          //counter++;
+
           string store = "";
-          //Stores time
-          double AccelX = 0.0;
-          //Stores X value of Acceleration
-          double AccelY = 0.0;
-          double GyrX = 0.0;
-          double GyrY = 0.0;
+          var bufferTemp = new List<double>();
+          
+          for (int i = 0; i < 9; i++){
+            // float curFloat = BitConverter.ToSingle(storeInputData, i * 4 + 3);
+            // store = store + curFloat.ToString() + " ";
+
+            bufferTemp.Add(Convert.ToDouble(BitConverter.ToSingle(storeInputData, i * 4 + 3)));
+      
+            
+          }
+
+
+          // Lock to copy over the data
           lock (bufferLock)
           {
-            for (int i = 0; i < 9; i++)
-            {
-              float curFloat = BitConverter.ToSingle(storeInputData, i * 4 + 3);
-              store = store + curFloat.ToString() + " ";
-              buffer.Add(Convert.ToDouble(BitConverter.ToSingle(storeInputData, i * 4 + 3)));
-            }
+            
+            AccelX.Add(bufferTemp[0]);
+            AccelY.Add(bufferTemp[1]);
+            AccelZ.Add(bufferTemp[2]);
+            
+           // buffer.AddRange(bufferTemp);
           }
+/*
+          if (saveToFile)
+          {
+            logger.logData(counter + " " + store + " " + DateTime.Now.ToString());
+          }
+          */
+          //st.Stop();
+          //Debug.WriteLine(st.ElapsedTicks);
+
           //SensorText.Text = store;
         }
       }
@@ -422,41 +464,56 @@ namespace App4
       } 
     }
 
+   
     private void Canvas_UpdateData(ICanvasAnimatedControl sender, CanvasAnimatedUpdateEventArgs args)
     {
+     /*
       if (args.Timing.IsRunningSlowly)
       {
         Debug.WriteLine("RUNNING SLOWLY");
       }
-      if (buffer.Count != 0)
+      */
+     // st.Restart();
+      if (AccelX.Count != 0)
       {
+      //  var tempBuffer = new List<Double>();
         lock (bufferLock) {
-          Debug.WriteLine(buffer.Count);
-          for (int i = 0; i < buffer.Count / 9; i = i + 9)
+        //  tempBuffer.AddRange(buffer);
+         for(int i = 0; i<AccelX.Count; i++)
           {
-            _dataAccelX.Add(buffer[i]);
-            _dataAccelY.Add(buffer[i + 1]);
-            _dataAccelZ.Add(buffer[i + 2]);
+            Acceleration.Add(new XYZ(AccelX[i], AccelY[i], AccelZ[i]));
           }
-          buffer.Clear();
+          AccelX.Clear();
+          AccelY.Clear();
+          AccelZ.Clear();
         }
+         /* 
+        st.Stop();
+        counter++;
+        average = (average + st.ElapsedTicks);
+        Debug.WriteLine(average/counter + " " + st.ElapsedTicks);*/
+        
+        
       }
     }
 
     private void Canvas_OnDraw(ICanvasAnimatedControl sender, CanvasAnimatedDrawEventArgs args)
     {
-      canvas.IsFixedTimeStep = false;
-      int width = 1100;
-      width = width - (width % 9) + 1;
-      int difference = 0;
-      if (_dataAccelX.Count > width + 1)
+      
+     // st.Restart();
+    canvas.IsFixedTimeStep = false;
+      int width = 999;
+      if (Acceleration.Count > width)
       {
-        difference = _dataAccelX.Count - width - 1;
+        Acceleration.RemoveRange(0, Acceleration.Count - width);
       }
-      _chartRenderer.RenderData(canvas, args, Colors.Black, DataStrokeThickness, _dataAccelX, difference);
-      _chartRenderer.RenderData(canvas, args, Colors.DarkGreen, DataStrokeThickness, _dataAccelY, difference);
-      _chartRenderer.RenderData(canvas, args, Colors.Blue, DataStrokeThickness, _dataAccelZ, difference);
+      _chartRenderer.RenderData(canvas, args, Colors.Black, DataStrokeThickness, Acceleration);
+    //  _chartRenderer.RenderData(canvas, args, Colors.DarkGreen, DataStrokeThickness, _dataAccelY, difference);
+    //  _chartRenderer.RenderData(canvas, args, Colors.Blue, DataStrokeThickness, _dataAccelZ, difference);
       _chartRenderer.RenderAxes(canvas, args);
+    //  st.Stop();
+     // Debug.WriteLine(st.ElapsedTicks + "!");
+     
     }
 
     private void DisconnectButton_Click(object sender, RoutedEventArgs e)
@@ -493,12 +550,8 @@ namespace App4
 
       NotifyUser(disconnectReason);
       buffer.Clear();
-      _dataAccelX.Clear();
-      _dataAccelY.Clear();
-      _dataAccelZ.Clear();
-      _dataAccelX.Add(0.0);
-      _dataAccelZ.Add(0.0);
-      _dataAccelY.Add(0.0);
+      Acceleration.Clear();
+      Acceleration.Add(new XYZ(0.0, 0.0, 0.0));
       ResetMainUI();
     }
 

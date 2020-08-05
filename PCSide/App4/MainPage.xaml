@@ -51,7 +51,7 @@
                             <TextBlock Style="{StaticResource BodyTextBlockStyle}" TextWrapping="Wrap">
                                     Enumerates all the Chat service instances that are known to Windows and connects to the selected one.
                             </TextBlock>
-                            <VariableSizedWrapGrid Orientation="Horizontal" ItemWidth="60">
+                            <VariableSizedWrapGrid x:Name="CheckBox" Orientation="Horizontal" ItemWidth="60">
                                 <Button x:Name="RunButton" HorizontalAlignment="Stretch"
                                         VerticalAlignment="Stretch"
                                         Content="Start"
@@ -73,15 +73,17 @@
                                         VariableSizedWrapGrid.ColumnSpan="5"
                                         Visibility="Collapsed"
                                         Click="RequestAccessButton_Click"/>
-                            </VariableSizedWrapGrid>
-
-                            <Border BorderBrush="AntiqueWhite" BorderThickness="1">
+                
+              </VariableSizedWrapGrid>
+              <CheckBox x:Name="checkBox" Content="Save data to temp file" Width="202"/>
+              <Border BorderBrush="AntiqueWhite" BorderThickness="1">
                                 <ListView x:Name="resultsListView"
                                           Visibility="Visible"
                                       ItemTemplate="{StaticResource ResultsListViewTemplate}"
                                       ItemsSource="{Binding Path=ResultCollection}"
                                       SelectionChanged="ResultsListView_SelectionChanged"
                                       MaxHeight="450"/>
+                              
                             </Border>
                         </StackPanel>
                     </ScrollViewer>

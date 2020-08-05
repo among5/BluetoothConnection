@@ -7,6 +7,7 @@ using Android.Runtime;
 using Android.Support.Wearable.Activity;
 using Android.Widget;
 using System;
+using System.Collections.Generic;
 
 namespace blueTest
 {
@@ -27,6 +28,11 @@ namespace blueTest
     private Sensor gyro;
     private byte[] package;
 
+    private int counter;
+    private int current;
+    private int sensorChangecounter;
+
+    private float[] sensorData;
     protected override void OnCreate(Bundle bundle)
     {
       base.OnCreate(bundle);
@@ -52,6 +58,10 @@ namespace blueTest
       package[1] = Convert.ToByte('A');
       package[2] = Convert.ToByte('P');
 
+      counter = 0;
+      sensorChangecounter = 0;
+      current = DateTime.Now.Second;
+      sensorData = new float[4];
 
       if (sensor_manager.GetDefaultSensor(SensorType.Accelerometer) != null)
       {
@@ -67,15 +77,18 @@ namespace blueTest
 
     public void OnSensorChanged(SensorEvent e)
     {
+      sensorChangecounter++;
+      e.Values.CopyTo(sensorData, 0);
       //Updates package of bytes based on which sensor updated and sends over new data
       // through bluetooth
       // If byte[] is ever less than length 4, sets extra values to 0
       switch (e.Sensor.Type)
       {
         case SensorType.Accelerometer:
-          byte[] accelX = BitConverter.GetBytes(e.Values[0]);
-          byte[] accelY = BitConverter.GetBytes(e.Values[1]);
-          byte[] accelZ = BitConverter.GetBytes(e.Values[2]);
+         
+          byte[] accelX = BitConverter.GetBytes(sensorData[0]);
+          byte[] accelY = BitConverter.GetBytes(sensorData[1]);
+          byte[] accelZ = BitConverter.GetBytes(sensorData[2]);
           for (int i = 3; i < 15; i++)
           {
             if (i < 7)
@@ -145,9 +158,10 @@ namespace blueTest
           break;
 
         case SensorType.Gyroscope:
-          byte[] gyrX = BitConverter.GetBytes(e.Values[0]);
-          byte[] gyrY = BitConverter.GetBytes(e.Values[1]);
-          byte[] gyrZ = BitConverter.GetBytes(e.Values[2]);
+          e.Values.CopyTo(sensorData, 0);
+          byte[] gyrX = BitConverter.GetBytes(sensorData[0]);
+          byte[] gyrY = BitConverter.GetBytes(sensorData[1]);
+          byte[] gyrZ = BitConverter.GetBytes(sensorData[2]);
           for (int i = 15; i < 27; i++)
           {
             if (i < 19)
@@ -221,8 +235,8 @@ namespace blueTest
     protected override void OnResume()
     {
       base.OnResume();
-      sensor_manager.RegisterListener(this, sensor, SensorDelay.Normal);
-      sensor_manager.RegisterListener(this, gyro, SensorDelay.Normal);
+      sensor_manager.RegisterListener(this, sensor, SensorDelay.Game);
+      sensor_manager.RegisterListener(this, gyro, SensorDelay.Game);
     }
 
     protected override void OnPause()
@@ -329,6 +343,19 @@ namespace blueTest
 
     private void SendMessage(byte[] message)
     {
+      counter++;
+      int curSec = DateTime.Now.Second;
+     // Console.WriteLine(message.ToString() + " " + DateTime.Now.ToString());
+      
+      if(curSec != current)
+      {
+        Console.WriteLine(counter + DateTime.Now.ToString());
+       // Console.WriteLine(sensorChangecounter + "*");
+        sensorChangecounter = 0;
+        current = curSec;
+        counter = 0;
+      }
+      
       if (messageChatService.GetState() != StateEnum.Connected)
       {
         Toast.MakeText(Application.Context, "NOT CONNECTED", ToastLength.Short).Show();

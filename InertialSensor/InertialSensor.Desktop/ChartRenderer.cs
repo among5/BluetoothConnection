@@ -67,24 +67,31 @@ namespace InertialSensor.Desktop
         {
           using (var dataSet3 = new CanvasPathBuilder(args.DrawingSession))
           {
-            XYZ firstVal = data[0];
-            cpb.BeginFigure(new Vector2(0, (float)((firstVal.X + 32) * 10)));
-            dataSet2.BeginFigure(new Vector2(0, (float)((firstVal.Y + 32) * 10)));
-            dataSet3.BeginFigure(new Vector2(0, (float)((firstVal.Z + 32) * 10)));
-            int width = data.Count < Constants.ChartWidth ? data.Count : Constants.ChartWidth;
-            for (int i = 0; i < width; i++)
+           using(var dataSet4 = new CanvasPathBuilder(args.DrawingSession))
             {
-              XYZ val = data[i];
-              cpb.AddLine(new Vector2(i, (float)(((val.X * -1) + 32) * 10)));
-              dataSet2.AddLine(new Vector2(i, (float)(((val.Y * -1) + 32) * 10)));
-              dataSet3.AddLine(new Vector2(i, (float)(((val.Z * -1) + 32) * 10)));
+              XYZ firstVal = data[0];
+              cpb.BeginFigure(new Vector2(0, (float)((firstVal.X + 32) * 10)));
+              dataSet2.BeginFigure(new Vector2(0, (float)((firstVal.Y + 32) * 10)));
+              dataSet3.BeginFigure(new Vector2(0, (float)((firstVal.Z + 32) * 10)));
+             // dataSet4.BeginFigure(new Vector2(0, (float)(Math.Sqrt((Math.Pow(firstVal.Z, 2) + Math.Pow(firstVal.Y, 2) + Math.Pow(firstVal.X, 2)) + 32) * 10)));
+              int width = data.Count < Constants.ChartWidth ? data.Count : Constants.ChartWidth;
+              for (int i = 0; i < width; i++)
+              {
+                XYZ val = data[i];
+                cpb.AddLine(new Vector2(i, (float)(((val.X * -1) + 32) * 10)));
+                dataSet2.AddLine(new Vector2(i, (float)(((val.Y * -1) + 32) * 10)));
+                dataSet3.AddLine(new Vector2(i, (float)(((val.Z * -1) + 32) * 10)));
+               // dataSet4.AddLine(new Vector2(i, (float)(((Math.Sqrt((Math.Pow(val.Z, 2) + Math.Pow(val.Y, 2) + Math.Pow(val.X, 2))) * -1) + 32) * 10)));
+              }
+              cpb.EndFigure(CanvasFigureLoop.Open);
+              dataSet2.EndFigure(CanvasFigureLoop.Open);
+              dataSet3.EndFigure(CanvasFigureLoop.Open);
+            //  dataSet4.EndFigure(CanvasFigureLoop.Open);
+              args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(cpb), Colors.Black, thickness);
+              args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(dataSet2), Colors.Blue, thickness);
+              args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(dataSet3), Colors.DarkGreen, thickness);
+            //  args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(dataSet4), Colors.IndianRed, thickness);
             }
-            cpb.EndFigure(CanvasFigureLoop.Open);
-            dataSet2.EndFigure(CanvasFigureLoop.Open);
-            dataSet3.EndFigure(CanvasFigureLoop.Open);
-            args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(cpb), Colors.Black, thickness);
-            args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(dataSet2), Colors.Fuchsia, thickness);
-            args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(dataSet3), Colors.PaleVioletRed, thickness);
           }
         }
       }

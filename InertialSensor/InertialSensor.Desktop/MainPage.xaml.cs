@@ -43,7 +43,7 @@ namespace InertialSensor.Desktop
     private List<double> buffer;
     private readonly object bufferLock = new object();
 
-    private byte[] storeInputData = new byte[BluetoothConstants.BluetoothPackage];
+    
     private Logger logger;
     private Stopwatch st;
 
@@ -363,34 +363,46 @@ namespace InertialSensor.Desktop
         while (true)
         {
           //st.Restart();
-          uint actualStringLength = await chatReader.LoadAsync(BluetoothConstants.BluetoothPackage);
-          if (actualStringLength < BluetoothConstants.BluetoothPackage)
+          uint header = await chatReader.LoadAsync(3);
+          uint packageSize = await chatReader.LoadAsync(4);
+          byte[] sizeTemp= new byte[7];
+          chatReader.ReadBytes(sizeTemp);
+          float sizeT = (BitConverter.ToSingle(sizeTemp, 3));
+          uint size = (uint)sizeT;
+          if(size != 0)
           {
-            Disconnect("Remote device terminated connection - make sure only one instance of server is running on remote device");
-            return;
-          }
-          chatReader.ReadBytes(storeInputData);
-
-         // string store = "";
-          var bufferTemp = new List<double>();
-          var temp = new List<XYZ>();
-          for(int j =0; j< storeInputData.Length; j += BluetoothConstants.SingleDataPoint) {
-            for (int i = 0; i < 3; i++)
+            uint actualStringLength = await chatReader.LoadAsync(size * BluetoothConstants.SingleDataPoint);
+            if (actualStringLength < packageSize * BluetoothConstants.SingleDataPoint)
             {
-              // float curFloat = BitConverter.ToSingle(storeInputData, i * 4 + 3);
-              // store = store + curFloat.ToString() + " ";
-              bufferTemp.Add(BitConverter.ToSingle(storeInputData, i * 4 + 3));
+              Disconnect("Remote device terminated connection - make sure only one instance of server is running on remote device");
+              return;
             }
-            temp.Add(new XYZ(bufferTemp[0], bufferTemp[1], bufferTemp[2]));
-          }
-          
+            byte[] storeInputData = new byte[actualStringLength];
+            chatReader.ReadBytes(storeInputData);
 
-          // Lock to copy over the data
-          lock (bufferLock)
-          {
-           
-            accelerationTemp.AddRange(temp);            
+            // string store = "";
+            var bufferTemp = new List<double>();
+            var temp = new List<XYZ>();
+            for (int j = 0; j < packageSize; j += BluetoothConstants.SingleDataPoint)
+            {
+              for (int i = 0; i < 3; i++)
+              {
+                // float curFloat = BitConverter.ToSingle(storeInputData, i * 4 + 3);
+                // store = store + curFloat.ToString() + " ";
+                bufferTemp.Add(BitConverter.ToSingle(storeInputData, i * 4 + 3));
+              }
+              temp.Add(new XYZ(bufferTemp[0], bufferTemp[1], bufferTemp[2]));
+            }
+
+
+            // Lock to copy over the data
+            lock (bufferLock)
+            {
+
+              accelerationTemp.AddRange(temp);
+            }
           }
+    
 /*
           if (saveToFile)
           {

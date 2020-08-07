@@ -8,6 +8,7 @@ using Android.Support.Wearable.Activity;
 using Android.Widget;
 using System;
 using System.Collections.Generic;
+using System.Timers;
 
 namespace InertialSensor.Watch
 {
@@ -28,12 +29,19 @@ namespace InertialSensor.Watch
     private Sensor gyro;
     private byte[] package;
 
+    private byte[] header;
+
+    private byte[] Magnetometer;
     private int counter;
     private int current;
     private int sensorChangecounter;
 
-    private byte[] dataPack; 
+    private Timer dispatcherTimer;
+    private List<Byte[]> AccelBuffer;
+    private List<Byte[]> GyrBuffer;
+    private byte[] dataPack;
 
+    private object bufferLock;
 
     private float[] sensorData;
     protected override void OnCreate(Bundle bundle)
@@ -52,15 +60,13 @@ namespace InertialSensor.Watch
       vibrator = (Vibrator)GetSystemService(VibratorService);
 
       package = new byte[39];
-
-      for(int i=0; i<package.Length; i++)
-      {
-        package[i] = 0;
-      }
-      package[0] = Convert.ToByte('Z');
-      package[1] = Convert.ToByte('A');
-      package[2] = Convert.ToByte('P');
-
+      header = new byte[3];
+      header[0] = Convert.ToByte('Z');
+      header[1] = Convert.ToByte('A');
+      header[2] = Convert.ToByte('P');
+      Magnetometer = new byte[] { 0, 0, 0 };
+      AccelBuffer = new List<Byte[]>();
+      GyrBuffer = new List<Byte[]>();
       counter = -1;
       sensorChangecounter = 0;
       current = DateTime.Now.Second;
@@ -71,13 +77,47 @@ namespace InertialSensor.Watch
       {
         vibrator.Vibrate(500);
       }
-   
+      dispatcherTimer = new Timer(2000);
+      dispatcherTimer.Elapsed += dispatcherTimer_Tick;
+      dispatcherTimer.Enabled = true;
       StartBluetooth();
     }
 
     public void OnAccuracyChanged(Sensor sensor, [GeneratedEnum] SensorStatus accuracy)
     {  
     }
+
+    private void dispatcherTimer_Tick(object sender, object e)
+    {
+      if (messageChatService != null)
+      {
+        int length = 1;
+        var pack = new List<Byte>();
+        if (AccelBuffer.Count > GyrBuffer.Count)
+        {
+          length = AccelBuffer.Count;
+        }
+        else
+        {
+          length = GyrBuffer.Count;
+        }
+        pack.AddRange(header);
+        int t = BitConverter.GetBytes(length).Length;
+        pack.AddRange(BitConverter.GetBytes(length));
+       // lock (bufferLock)
+        
+          for (int i = 0; i < length; i++)
+          {
+            pack.AddRange(AccelBuffer[i]);
+            pack.AddRange(GyrBuffer[i]);
+            pack.AddRange(Magnetometer);
+          }
+        
+        
+        SendMessage(pack.ToArray());
+      }
+    }
+
 
     public void OnSensorChanged(SensorEvent e)
     {
@@ -89,13 +129,13 @@ namespace InertialSensor.Watch
       switch (e.Sensor.Type)
       {
         case SensorType.Accelerometer:
-         
+          byte[] AccelData = new byte[12];
           byte[] accelX = BitConverter.GetBytes(sensorData[0]);
           byte[] accelY = BitConverter.GetBytes(sensorData[1]);
           byte[] accelZ = BitConverter.GetBytes(sensorData[2]);
-          for (int i = 3; i < 15; i++)
+          for (int i = 0; i < 12; i++)
           {
-            if (i < 7)
+            if (i < 4)
             {
               if (accelX.Length < 4)
               {
@@ -113,9 +153,9 @@ namespace InertialSensor.Watch
                 }
                 accelX = temp;
               }
-              package[i] = accelX[i - 3];
+              AccelData[i] = accelX[i];
             }
-            else if (i < 11)
+            else if (i < 8)
             {
               if (accelY.Length < 4)
               {
@@ -135,7 +175,7 @@ namespace InertialSensor.Watch
               }
 
 
-              package[i] = accelY[i - 7];
+              package[i] = accelY[i - 4];
             }
             else
             {
@@ -155,26 +195,23 @@ namespace InertialSensor.Watch
                 }
                 accelZ = temp;
               }
-              package[i] = accelZ[i - 11];
+              package[i] = accelZ[i - 8];
             }
           }
-          package.CopyTo(dataPack, counter * 39);
-          if(counter == 9)
-          {
-            SendMessage(dataPack);
-            counter = -1;
-          }
-       
+          //lock (bufferLock) { }
+          AccelBuffer.Add(AccelData);
+
           break;
 
         case SensorType.Gyroscope:
           e.Values.CopyTo(sensorData, 0);
+          byte[] GyrData = new byte[12];
           byte[] gyrX = BitConverter.GetBytes(sensorData[0]);
           byte[] gyrY = BitConverter.GetBytes(sensorData[1]);
           byte[] gyrZ = BitConverter.GetBytes(sensorData[2]);
-          for (int i = 15; i < 27; i++)
+          for (int i = 0; i < 12; i++)
           {
-            if (i < 19)
+            if (i < 4)
             {
               if (gyrX.Length < 4)
               {
@@ -183,7 +220,7 @@ namespace InertialSensor.Watch
                 {
                   if (j < gyrX.Length)
                   {
-                    temp[j] = gyrX[j];
+                    temp[i] = gyrX[j];
                   }
                   else
                   {
@@ -192,9 +229,9 @@ namespace InertialSensor.Watch
                 }
                 gyrX = temp;
               }
-              package[i] = gyrX[i - 15];
+              GyrData[i] = gyrX[i];
             }
-            else if (i < 23)
+            else if (i < 8)
             {
               if (gyrY.Length < 4)
               {
@@ -212,7 +249,9 @@ namespace InertialSensor.Watch
                 }
                 gyrY = temp;
               }
-              package[i] = gyrY[i - 19];
+
+
+              package[i] = gyrY[i - 4];
             }
             else
             {
@@ -232,15 +271,11 @@ namespace InertialSensor.Watch
                 }
                 gyrZ = temp;
               }
-              package[i] = gyrZ[i - 23];
+              package[i] = gyrZ[i - 8];
             }
           }
-          package.CopyTo(dataPack, counter * 39);
-          if (counter == 9)
-          {
-            SendMessage(dataPack);
-            counter = -1;
-          }
+          //lock (bufferLock) {  }
+          GyrBuffer.Add(GyrData);
           break;
         default:
           throw new Exception("Unhandled Sensor type");
@@ -376,11 +411,7 @@ namespace InertialSensor.Watch
         Toast.MakeText(Application.Context, "NOT CONNECTED", ToastLength.Short).Show();
         return;
       }
-
-      if(message.Length != 390)
-      {
-        throw new ArgumentException("Length != 390");
-      }   
+ 
 
       messageChatService.Write(message);
     }

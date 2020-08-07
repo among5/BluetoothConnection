@@ -9,7 +9,7 @@ namespace InertialSensor.Common
   public class BluetoothConstants
   {
     public const int NumDataPoints = 10;
-    public const int SingleDataPoint = 39;
+    public const int SingleDataPoint = 36;
     public const int BluetoothPackage = NumDataPoints * SingleDataPoint;
   }
 }

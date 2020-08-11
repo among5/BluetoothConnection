@@ -67,6 +67,7 @@
 
               </VariableSizedWrapGrid>
               <CheckBox x:Name="checkBox" Content="Save data to temp file" Width="202" Margin="0,0,0,10"/>
+              <TextBlock x:Name = "FilePath" />
             </StackPanel>
 
           </ScrollViewer>

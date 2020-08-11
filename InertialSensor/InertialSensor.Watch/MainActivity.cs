@@ -5,6 +5,7 @@ using Android.Hardware;
 using Android.OS;
 using Android.Runtime;
 using Android.Support.Wearable.Activity;
+using Android.Views;
 using Android.Widget;
 using System;
 using System.Collections.Generic;
@@ -34,22 +35,22 @@ namespace InertialSensor.Watch
     private byte[] Magnetometer;
     private int counter;
     private int current;
-    private int sensorChangecounter;
 
     private Timer dispatcherTimer;
+    private Timer beginBluetooth;
     private List<Byte[]> AccelBuffer;
     private List<Byte[]> GyrBuffer;
     private byte[] dataPack;
 
-    private object bufferLock;
+    private readonly object bufferLock = new object();
 
     private float[] sensorData;
+
+    private Button button;
     protected override void OnCreate(Bundle bundle)
     {
       base.OnCreate(bundle);
-      SetContentView(Resource.Layout.activity_main);
-
-      SetAmbientEnabled();
+      SetContentView(Resource.Layout.activity_main); 
 
       bluetoothAdapter = BluetoothAdapter.DefaultAdapter;
       messageHandler = new Handler();
@@ -64,11 +65,10 @@ namespace InertialSensor.Watch
       header[0] = Convert.ToByte('Z');
       header[1] = Convert.ToByte('A');
       header[2] = Convert.ToByte('P');
-      Magnetometer = new byte[] { 0, 0, 0 };
+      Magnetometer = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
       AccelBuffer = new List<Byte[]>();
       GyrBuffer = new List<Byte[]>();
       counter = -1;
-      sensorChangecounter = 0;
       current = DateTime.Now.Second;
       sensorData = new float[4];
 
@@ -77,10 +77,14 @@ namespace InertialSensor.Watch
       {
         vibrator.Vibrate(500);
       }
-      dispatcherTimer = new Timer(2000);
-      dispatcherTimer.Elapsed += dispatcherTimer_Tick;
+ 
+      button = FindViewById<Button>(Resource.Id.button1);
+      dispatcherTimer = new Timer(20);
       dispatcherTimer.Enabled = true;
-      StartBluetooth();
+      dispatcherTimer.Elapsed += dispatcherTimer_Tick;
+
+      SetAmbientEnabled();
+      
     }
 
     public void OnAccuracyChanged(Sensor sensor, [GeneratedEnum] SensorStatus accuracy)
@@ -89,222 +93,250 @@ namespace InertialSensor.Watch
 
     private void dispatcherTimer_Tick(object sender, object e)
     {
+      List<Byte[]> tempAccel = new List<Byte[]>();
+      List<Byte[]> tempGyr = new List<Byte[]>();
       if (messageChatService != null)
       {
-        int length = 1;
+        int length;
         var pack = new List<Byte>();
-        if (AccelBuffer.Count > GyrBuffer.Count)
+        lock (bufferLock)
         {
-          length = AccelBuffer.Count;
+          if (AccelBuffer.Count < GyrBuffer.Count)
+          {
+            length = AccelBuffer.Count;
+          }
+          else
+          {
+            length = GyrBuffer.Count;
+          }
+          tempAccel.AddRange(AccelBuffer);
+          tempGyr.AddRange(GyrBuffer);
+          AccelBuffer.Clear();
+          GyrBuffer.Clear();
         }
-        else
-        {
-          length = GyrBuffer.Count;
-        }
-        pack.AddRange(header);
-        int t = BitConverter.GetBytes(length).Length;
-        pack.AddRange(BitConverter.GetBytes(length));
-       // lock (bufferLock)
-        
+          pack.AddRange(header);
+          int t = BitConverter.GetBytes(length).Length;
+          pack.AddRange(BitConverter.GetBytes(length));
           for (int i = 0; i < length; i++)
           {
-            pack.AddRange(AccelBuffer[i]);
-            pack.AddRange(GyrBuffer[i]);
+            pack.AddRange(tempAccel[i]);
+            pack.AddRange(tempGyr[i]);
             pack.AddRange(Magnetometer);
           }
-        
-        
+          
+     
+
         SendMessage(pack.ToArray());
       }
     }
 
-
     public void OnSensorChanged(SensorEvent e)
     {
-      counter++;
-      e.Values.CopyTo(sensorData, 0);
-      //Updates package of bytes based on which sensor updated and sends over new data
-      // through bluetooth
-      // If byte[] is ever less than length 4, sets extra values to 0
-      switch (e.Sensor.Type)
+      try
       {
-        case SensorType.Accelerometer:
-          byte[] AccelData = new byte[12];
-          byte[] accelX = BitConverter.GetBytes(sensorData[0]);
-          byte[] accelY = BitConverter.GetBytes(sensorData[1]);
-          byte[] accelZ = BitConverter.GetBytes(sensorData[2]);
-          for (int i = 0; i < 12; i++)
-          {
-            if (i < 4)
+        e.Values.CopyTo(sensorData, 0);
+        //Updates package of bytes based on which sensor updated and sends over new data
+        // through bluetooth
+        // If byte[] is ever less than length 4, sets extra values to 0
+
+        switch (e.Sensor.Type)
+        {
+          case SensorType.Accelerometer:
+            byte[] AccelData = new byte[12];
+            byte[] accelX = BitConverter.GetBytes(sensorData[0]);
+            byte[] accelY = BitConverter.GetBytes(sensorData[1]);
+            byte[] accelZ = BitConverter.GetBytes(sensorData[2]);
+            for (int i = 0; i < 12; i++)
             {
-              if (accelX.Length < 4)
+              if (i < 4)
               {
-                byte[] temp = new byte[4];
-                for (int j = 0; j < 4; j++)
+                if (accelX.Length < 4)
                 {
-                  if (j < accelX.Length)
+                  byte[] temp = new byte[4];
+                  for (int j = 0; j < 4; j++)
                   {
-                    temp[i] = accelX[j];
+                    if (j < accelX.Length)
+                    {
+                      temp[i] = accelX[j];
+                    }
+                    else
+                    {
+                      temp[j] = 0;
+                    }
                   }
-                  else
-                  {
-                    temp[j] = 0;
-                  }
+                  accelX = temp;
                 }
-                accelX = temp;
+                AccelData[i] = accelX[i];
               }
-              AccelData[i] = accelX[i];
-            }
-            else if (i < 8)
-            {
-              if (accelY.Length < 4)
+              else if (i < 8)
               {
-                byte[] temp = new byte[4];
-                for (int j = 0; j < 4; j++)
+                if (accelY.Length < 4)
                 {
-                  if (j < accelY.Length)
+                  byte[] temp = new byte[4];
+                  for (int j = 0; j < 4; j++)
                   {
-                    temp[j] = accelY[j];
+                    if (j < accelY.Length)
+                    {
+                      temp[j] = accelY[j];
+                    }
+                    else
+                    {
+                      temp[j] = 0;
+                    }
                   }
-                  else
-                  {
-                    temp[j] = 0;
-                  }
+                  accelY = temp;
                 }
-                accelY = temp;
-              }
 
 
-              package[i] = accelY[i - 4];
-            }
-            else
-            {
-              if (accelZ.Length < 4)
-              {
-                byte[] temp = new byte[4];
-                for (int j = 0; j < 4; j++)
-                {
-                  if (j < accelZ.Length)
-                  {
-                    temp[j] = accelZ[j];
-                  }
-                  else
-                  {
-                    temp[j] = 0;
-                  }
-                }
-                accelZ = temp;
+                AccelData[i] = accelY[i - 4];
               }
-              package[i] = accelZ[i - 8];
-            }
-          }
-          //lock (bufferLock) { }
-          AccelBuffer.Add(AccelData);
-
-          break;
-
-        case SensorType.Gyroscope:
-          e.Values.CopyTo(sensorData, 0);
-          byte[] GyrData = new byte[12];
-          byte[] gyrX = BitConverter.GetBytes(sensorData[0]);
-          byte[] gyrY = BitConverter.GetBytes(sensorData[1]);
-          byte[] gyrZ = BitConverter.GetBytes(sensorData[2]);
-          for (int i = 0; i < 12; i++)
-          {
-            if (i < 4)
-            {
-              if (gyrX.Length < 4)
+              else
               {
-                byte[] temp = new byte[4];
-                for (int j = 0; j < 4; j++)
+                if (accelZ.Length < 4)
                 {
-                  if (j < gyrX.Length)
+                  byte[] temp = new byte[4];
+                  for (int j = 0; j < 4; j++)
                   {
-                    temp[i] = gyrX[j];
+                    if (j < accelZ.Length)
+                    {
+                      temp[j] = accelZ[j];
+                    }
+                    else
+                    {
+                      temp[j] = 0;
+                    }
                   }
-                  else
-                  {
-                    temp[j] = 0;
-                  }
+                  accelZ = temp;
                 }
-                gyrX = temp;
+                AccelData[i] = accelZ[i - 8];
               }
-              GyrData[i] = gyrX[i];
             }
-            else if (i < 8)
+            lock (bufferLock)
             {
-              if (gyrY.Length < 4)
+              AccelBuffer.Add(AccelData);
+            }
+            break;
+
+          case SensorType.Gyroscope:
+            e.Values.CopyTo(sensorData, 0);
+            byte[] GyrData = new byte[12];
+            byte[] gyrX = BitConverter.GetBytes(sensorData[0]);
+            byte[] gyrY = BitConverter.GetBytes(sensorData[1]);
+            byte[] gyrZ = BitConverter.GetBytes(sensorData[2]);
+            for (int i = 0; i < 12; i++)
+            {
+              if (i < 4)
               {
-                byte[] temp = new byte[4];
-                for (int j = 0; j < 4; j++)
+                if (gyrX.Length < 4)
                 {
-                  if (j < gyrY.Length)
+                  byte[] temp = new byte[4];
+                  for (int j = 0; j < 4; j++)
                   {
-                    temp[j] = gyrY[j];
+                    if (j < gyrX.Length)
+                    {
+                      temp[i] = gyrX[j];
+                    }
+                    else
+                    {
+                      temp[j] = 0;
+                    }
                   }
-                  else
-                  {
-                    temp[j] = 0;
-                  }
+                  gyrX = temp;
                 }
-                gyrY = temp;
+                GyrData[i] = gyrX[i];
               }
+              else if (i < 8)
+              {
+                if (gyrY.Length < 4)
+                {
+                  byte[] temp = new byte[4];
+                  for (int j = 0; j < 4; j++)
+                  {
+                    if (j < gyrY.Length)
+                    {
+                      temp[j] = gyrY[j];
+                    }
+                    else
+                    {
+                      temp[j] = 0;
+                    }
+                  }
+                  gyrY = temp;
+                }
 
 
-              package[i] = gyrY[i - 4];
-            }
-            else
-            {
-              if (gyrZ.Length < 4)
-              {
-                byte[] temp = new byte[4];
-                for (int j = 0; j < 4; j++)
-                {
-                  if (j < gyrZ.Length)
-                  {
-                    temp[j] = gyrZ[j];
-                  }
-                  else
-                  {
-                    temp[j] = 0;
-                  }
-                }
-                gyrZ = temp;
+                GyrData[i] = gyrY[i - 4];
               }
-              package[i] = gyrZ[i - 8];
+              else
+              {
+                if (gyrZ.Length < 4)
+                {
+                  byte[] temp = new byte[4];
+                  for (int j = 0; j < 4; j++)
+                  {
+                    if (j < gyrZ.Length)
+                    {
+                      temp[j] = gyrZ[j];
+                    }
+                    else
+                    {
+                      temp[j] = 0;
+                    }
+                  }
+                  gyrZ = temp;
+                }
+                GyrData[i] = gyrZ[i - 8];
+              }
             }
-          }
-          //lock (bufferLock) {  }
-          GyrBuffer.Add(GyrData);
-          break;
-        default:
-          throw new Exception("Unhandled Sensor type");
+            lock (bufferLock) { GyrBuffer.Add(GyrData); }
+            break;
+          default:
+            throw new Exception("Unhandled Sensor type");
+        }
+      }
+      catch
+      {
+        throw;
       }
     }
 
     protected override void OnResume()
     {
       base.OnResume();
-      sensor_manager.RegisterListener(this, sensor, SensorDelay.Game);
-      sensor_manager.RegisterListener(this, gyro, SensorDelay.Game);
     }
 
     protected override void OnPause()
     {
-      base.OnPause();
-      sensor_manager.UnregisterListener(this);
+
+        base.OnPause();
+
     }
 
     protected override void OnStart()
     {
       base.OnStart();
+      
       if (messageChatService is null)
       {
         //On start, restart the bluetooth connection
         SetupTransfer();
       }
+
+      sensor_manager.RegisterListener(this, sensor, SensorDelay.Game);
+      sensor_manager.RegisterListener(this, gyro, SensorDelay.Game);
+      dispatcherTimer = new Timer(20);
+      dispatcherTimer.Enabled = true;
     }
- 
+
+    protected override void OnStop()
+    {
+      base.OnStop();
+      dispatcherTimer.Stop();
+
+      sensor_manager.UnregisterListener(this);
+      // SetupTransfer();
+      //this.UnregisterReceiver(BroadcastReceiver);
+    }
     protected override void OnActivityResult(int requestCode, Result result, Intent data)
     {
       base.OnActivityResult(requestCode, result, data);
@@ -377,13 +409,6 @@ namespace InertialSensor.Watch
       }
     }
 
-    protected override void OnStop()
-    {
-      base.OnStop();
-     // SetupTransfer();
-      //this.UnregisterReceiver(BroadcastReceiver);
-    }
-
     //Creates new instance of SendData and starts AcceptThread to accept new connections
     private void SetupTransfer()
     {
@@ -392,20 +417,7 @@ namespace InertialSensor.Watch
     }
 
     private void SendMessage(byte[] message)
-    {
-      counter++;
-      int curSec = DateTime.Now.Second;
-     // Console.WriteLine(message.ToString() + " " + DateTime.Now.ToString());
-      
-      if(curSec != current)
-      {
-      //  Console.WriteLine(counter + DateTime.Now.ToString());
-       // Console.WriteLine(sensorChangecounter + "*");
-        sensorChangecounter = 0;
-        current = curSec;
-        counter = 0;
-      }
-      
+    {    
       if (messageChatService.GetState() != StateEnum.Connected)
       {
         Toast.MakeText(Application.Context, "NOT CONNECTED", ToastLength.Short).Show();

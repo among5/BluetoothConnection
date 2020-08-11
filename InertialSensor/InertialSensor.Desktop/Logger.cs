@@ -25,21 +25,11 @@ namespace InertialSensor.Desktop
       {
           writer.WriteLine(data);
         }
-      
-    /*
-      var stream = await sampleFile.OpenAsync(Windows.Storage.FileAccessMode.ReadWrite);
-      using (var outputStream = stream.GetOutputStreamAt(0))
-      {
-        using (var dataWriter = new Windows.Storage.Streams.DataWriter(outputStream))
-        {
-          dataWriter.WriteString(data);
-          await dataWriter.StoreAsync();
-          await outputStream.FlushAsync();
-        }
-      }
-      stream.Dispose(); // Or use the stream variable (see previous code snippet) with a using statement as well.
-      */
-     // await FileIO.WriteTextAsync(sampleFile, data);
+    }
+
+    public String getPath()
+    {
+      return sampleFile.Path;
     }
 
   }

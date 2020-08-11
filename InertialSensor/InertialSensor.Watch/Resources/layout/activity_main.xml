@@ -10,7 +10,17 @@
   <RelativeLayout
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="@dimen/inner_frame_layout_padding">
-       
+    android:padding="@dimen/inner_frame_layout_padding"
+    android:minWidth="25px"
+    android:minHeight="25px">
+    <Button
+      android:text="Not Connected"
+      android:layout_width="match_parent"
+      android:layout_height="224.0dp"
+      android:id="@+id/button1"
+      android:textColor="#ffffffff"
+      android:visibility="visible"
+      android:background="@color/dark_red" />
+
   </RelativeLayout>
 </android.support.wear.widget.BoxInsetLayout>

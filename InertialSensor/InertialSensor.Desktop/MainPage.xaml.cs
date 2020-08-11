@@ -16,7 +16,6 @@ using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media.Imaging;
-using InertialSensor.Common;
 
 // The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -43,7 +42,6 @@ namespace InertialSensor.Desktop
     private List<double> buffer;
     private readonly object bufferLock = new object();
 
-    
     private Logger logger;
     private Stopwatch st;
 
@@ -54,9 +52,11 @@ namespace InertialSensor.Desktop
       ResultCollection = new ObservableCollection<RfcommChatDeviceDisplay>();
       _chartRenderer = new ChartRenderer();
       Acceleration.Add(new XYZ(0.0, 0.0, 0.0));
-      // logger = new Logger("dataLog.txt");
+      logger = new Logger("dataLog.txt");
+      FilePath.Text = logger.getPath();
       //st = new Stopwatch();
       canvas.TargetElapsedTime = TimeSpan.FromMilliseconds(100);
+
       DataContext = this;
     }
 
@@ -367,12 +367,12 @@ namespace InertialSensor.Desktop
           uint packageSize = await chatReader.LoadAsync(4);
           byte[] sizeTemp= new byte[7];
           chatReader.ReadBytes(sizeTemp);
-          float sizeT = (BitConverter.ToSingle(sizeTemp, 3));
-          uint size = (uint)sizeT;
+          int sizeT = (BitConverter.ToInt32(sizeTemp, 3));
+          uint size = Convert.ToUInt32(sizeT);
           if(size != 0)
           {
-            uint actualStringLength = await chatReader.LoadAsync(size * BluetoothConstants.SingleDataPoint);
-            if (actualStringLength < packageSize * BluetoothConstants.SingleDataPoint)
+            uint actualStringLength = await chatReader.LoadAsync(size * 36);
+            if (actualStringLength < size * 36)
             {
               Disconnect("Remote device terminated connection - make sure only one instance of server is running on remote device");
               return;
@@ -380,18 +380,22 @@ namespace InertialSensor.Desktop
             byte[] storeInputData = new byte[actualStringLength];
             chatReader.ReadBytes(storeInputData);
 
-            // string store = "";
-            var bufferTemp = new List<double>();
+             string store = "";
+            var bufferTemp = new List<float>();
             var temp = new List<XYZ>();
-            for (int j = 0; j < packageSize; j += BluetoothConstants.SingleDataPoint)
+            for (int j = 0; j < size; j += 36)
             {
-              for (int i = 0; i < 3; i++)
+              float curFloat = BitConverter.ToSingle(storeInputData, j);
+              store = store + curFloat.ToString() + " ";
+              bufferTemp.Add(curFloat);
+              for (int i = 1; i < 3; i++)
               {
-                // float curFloat = BitConverter.ToSingle(storeInputData, i * 4 + 3);
-                // store = store + curFloat.ToString() + " ";
-                bufferTemp.Add(BitConverter.ToSingle(storeInputData, i * 4 + 3));
+                curFloat = BitConverter.ToSingle(storeInputData, i * 4 + j);
+                 store = store + curFloat.ToString() + " ";
+                bufferTemp.Add(curFloat);
               }
               temp.Add(new XYZ(bufferTemp[0], bufferTemp[1], bufferTemp[2]));
+              bufferTemp.Clear();
             }
 
 
@@ -401,14 +405,15 @@ namespace InertialSensor.Desktop
 
               accelerationTemp.AddRange(temp);
             }
+            if (saveToFile)
+            {
+              logger.logData(store);
+            }
           }
     
-/*
-          if (saveToFile)
-          {
-            logger.logData(counter + " " + store + " " + DateTime.Now.ToString());
-          }
-          */
+
+          
+         
           //st.Stop();
           //Debug.WriteLine(st.ElapsedTicks);
           //SensorText.Text = store;

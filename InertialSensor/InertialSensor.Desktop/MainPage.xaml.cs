@@ -37,7 +37,7 @@ namespace InertialSensor.Desktop
     private readonly List<XYZ> accelerationTemp = new List<XYZ>();
 
     private readonly ChartRenderer _chartRenderer;
-
+   
     private Boolean saveToFile;
     private List<double> buffer;
     private readonly object bufferLock = new object();
@@ -56,7 +56,6 @@ namespace InertialSensor.Desktop
       FilePath.Text = logger.getPath();
       //st = new Stopwatch();
       canvas.TargetElapsedTime = TimeSpan.FromMilliseconds(100);
-
       DataContext = this;
     }
 
@@ -397,7 +396,7 @@ namespace InertialSensor.Desktop
               temp.Add(new XYZ(bufferTemp[0], bufferTemp[1], bufferTemp[2]));
               bufferTemp.Clear();
             }
-
+           
 
             // Lock to copy over the data
             lock (bufferLock)
@@ -405,18 +404,12 @@ namespace InertialSensor.Desktop
 
               accelerationTemp.AddRange(temp);
             }
+          //  FilePath.Text = store;
             if (saveToFile)
             {
               logger.logData(store);
             }
-          }
-    
-
-          
-         
-          //st.Stop();
-          //Debug.WriteLine(st.ElapsedTicks);
-          //SensorText.Text = store;
+          }         
         }
       }
       catch (Exception ex)
@@ -467,7 +460,6 @@ namespace InertialSensor.Desktop
       {
         Acceleration.RemoveRange(0, Acceleration.Count - width);
       }
-
       _chartRenderer.RenderData(canvas, args, Colors.Black, DataStrokeThickness, Acceleration);
       _chartRenderer.RenderAxes(canvas, args);
       // st.Stop();

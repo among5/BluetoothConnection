@@ -30,7 +30,6 @@ namespace InertialSensor.Watch
     private Vibrator vibrator;
     private Sensor gyro;
     private byte[] package;
-
     private byte[] header;
 
     private byte[] Magnetometer;
@@ -72,7 +71,6 @@ namespace InertialSensor.Watch
       counter = 0;
       current = DateTime.Now.Second;
       sensorData = new float[4];
-
       dataPack = new byte[390];
       if (sensor_manager.GetDefaultSensor(SensorType.Accelerometer) != null)
       {
@@ -434,8 +432,13 @@ namespace InertialSensor.Watch
     {    
       if (messageChatService.GetState() != StateEnum.Connected)
       {
-        Toast.MakeText(Application.Context, "NOT CONNECTED", ToastLength.Short).Show();
-        return;
+        button.SetBackgroundColor(Color.BlueViolet);
+        button.Text = "Ready to Connect";
+      }
+      else
+      {
+        button.SetBackgroundColor(Color.ForestGreen);
+        button.Text = "Connected";
       }
  
 

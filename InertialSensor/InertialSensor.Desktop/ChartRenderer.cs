@@ -36,9 +36,31 @@ namespace InertialSensor.Desktop
         args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(cpb), Colors.Gray, 1);
       }
 
-      args.DrawingSession.DrawText("0", 5, midHeight - 30, Colors.Gray);
-      args.DrawingSession.DrawText(width.ToString(), width - 50, midHeight - 30, Colors.Gray);
+      for (int i = -31; i < 31; i++)
+      {
+        using (var cpb = new CanvasPathBuilder(args.DrawingSession))
+        {
+          if(i % 10 == 0)
+          {
+            cpb.BeginFigure(new Vector2(485, midHeight - i * 10));
+            cpb.AddLine(new Vector2(515, midHeight - i * 10));
+            cpb.EndFigure(CanvasFigureLoop.Open);
+            args.DrawingSession.DrawText(i.ToString(), midWidth + 10, midHeight - i * 10, Colors.Gray);
+            args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(cpb), Colors.Black, 1);
+          }
+          else
+          {
+            cpb.BeginFigure(new Vector2(490, midHeight - i * 10));
+            cpb.AddLine(new Vector2(510, midHeight - i * 10));
+            cpb.EndFigure(CanvasFigureLoop.Open);
+            args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(cpb), Colors.LightGray, 1);
+          }
+          
+        }
 
+        
+      }
+       // args.DrawingSession.DrawText(i.ToString(), 490, midHeight + i, Colors.Gray);
       using (var cpb = new CanvasPathBuilder(args.DrawingSession))
       {
         // Vertical line
@@ -54,9 +76,7 @@ namespace InertialSensor.Desktop
 
         args.DrawingSession.DrawGeometry(CanvasGeometry.CreatePath(cpb), Colors.Gray, 1);
       }
-
-      args.DrawingSession.DrawText("0", midWidth + 5, height - 30, Colors.Gray);
-      args.DrawingSession.DrawText("1", midWidth + 5, 5, Colors.Gray);
+      
     }
 
     public void RenderData(CanvasAnimatedControl canvas, CanvasAnimatedDrawEventArgs args, Color color, float thickness, List<XYZ> data)
@@ -78,9 +98,9 @@ namespace InertialSensor.Desktop
               for (int i = 0; i < width; i++)
               {
                 XYZ val = data[i];
-                cpb.AddLine(new Vector2(i, (float)(((val.X * -1) + 32) * 10)));
-                dataSet2.AddLine(new Vector2(i, (float)(((val.Y * -1) + 32) * 10)));
-                dataSet3.AddLine(new Vector2(i, (float)(((val.Z * -1) + 32) * 10)));
+                cpb.AddLine(new Vector2(i, (float)(((val.X * -1) + 29.5) * 10)));
+                dataSet2.AddLine(new Vector2(i, (float)(((val.Y * -1) + 29.5) * 10)));
+                dataSet3.AddLine(new Vector2(i, (float)(((val.Z * -1) + 29.5) * 10)));
                // dataSet4.AddLine(new Vector2(i, (float)(((Math.Sqrt((Math.Pow(val.Z, 2) + Math.Pow(val.Y, 2) + Math.Pow(val.X, 2))) * -1) + 32) * 10)));
               }
               cpb.EndFigure(CanvasFigureLoop.Open);

@@ -1,6 +1,7 @@
 using Android.App;
 using Android.Bluetooth;
 using Android.Content;
+using Android.Graphics;
 using Android.Hardware;
 using Android.OS;
 using Android.Runtime;
@@ -68,7 +69,7 @@ namespace InertialSensor.Watch
       Magnetometer = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
       AccelBuffer = new List<Byte[]>();
       GyrBuffer = new List<Byte[]>();
-      counter = -1;
+      counter = 0;
       current = DateTime.Now.Second;
       sensorData = new float[4];
 
@@ -81,8 +82,10 @@ namespace InertialSensor.Watch
       button = FindViewById<Button>(Resource.Id.button1);
       dispatcherTimer = new Timer(20);
       dispatcherTimer.Enabled = true;
-      dispatcherTimer.Elapsed += dispatcherTimer_Tick;
 
+      beginBluetooth = new Timer(1000);
+      beginBluetooth.Enabled = true;
+      beginBluetooth.Elapsed += beginBluetooth_Tick;
       SetAmbientEnabled();
       
     }
@@ -91,7 +94,13 @@ namespace InertialSensor.Watch
     {  
     }
 
-    private void dispatcherTimer_Tick(object sender, object e)
+    private void beginBluetooth_Tick(object sender, object e)
+    {
+      beginBluetooth.Enabled = false;
+      StartBluetooth();
+    }
+
+      private void dispatcherTimer_Tick(object sender, object e)
     {
       List<Byte[]> tempAccel = new List<Byte[]>();
       List<Byte[]> tempGyr = new List<Byte[]>();
@@ -123,8 +132,6 @@ namespace InertialSensor.Watch
             pack.AddRange(tempGyr[i]);
             pack.AddRange(Magnetometer);
           }
-          
-     
 
         SendMessage(pack.ToArray());
       }
@@ -138,7 +145,6 @@ namespace InertialSensor.Watch
         //Updates package of bytes based on which sensor updated and sends over new data
         // through bluetooth
         // If byte[] is ever less than length 4, sets extra values to 0
-
         switch (e.Sensor.Type)
         {
           case SensorType.Accelerometer:
@@ -316,7 +322,7 @@ namespace InertialSensor.Watch
     {
       base.OnStart();
       
-      if (messageChatService is null)
+      if (messageChatService is null && beginBluetooth.Enabled == false)
       {
         //On start, restart the bluetooth connection
         SetupTransfer();
@@ -381,11 +387,16 @@ namespace InertialSensor.Watch
         }
         else
         {
-          Toast.MakeText(Application.Context, "Device already enabled " + "\n" + "Scanning for remote Bluetooth devices..", ToastLength.Short).Show();
+          DiscoverDevices();
+          MakeDiscoverable();
+          button.SetBackgroundColor(Color.BlueViolet);
+          button.Text = "Ready to Connect";
+          SetupTransfer();
+          dispatcherTimer.Enabled = true;
+          dispatcherTimer.Elapsed += dispatcherTimer_Tick;
         }
 
-        DiscoverDevices();
-       // MakeDiscoverable();
+
       }
     }
     protected void MakeDiscoverable()
@@ -397,16 +408,17 @@ namespace InertialSensor.Watch
 
     protected void DiscoverDevices()
     {
+      bluetoothAdapter.StartDiscovery();
       //Scan for remote Bluetooth devices
-      if (bluetoothAdapter.StartDiscovery())
-      {
-        Toast.MakeText(Application.Context, "Discovering other devices...", ToastLength.Short).Show();
+      //if (bluetoothAdapter.StartDiscovery())
+      //{
+      //  Toast.MakeText(Application.Context, "Discovering other devices...", ToastLength.Short).Show();
         
-      }
-      else
-      {
-        Toast.MakeText(Application.Context, "Discovery failed to start", ToastLength.Short).Show();
-      }
+      //}
+      //else
+      //{
+      //  Toast.MakeText(Application.Context, "Discovery failed to start", ToastLength.Short).Show();
+      //}
     }
 
     //Creates new instance of SendData and starts AcceptThread to accept new connections
@@ -414,6 +426,8 @@ namespace InertialSensor.Watch
     {
       messageChatService = new SendData(messageHandler);
       messageChatService.Start();
+      button.SetBackgroundColor(Color.ForestGreen);
+      button.Text = "Connected";
     }
 
     private void SendMessage(byte[] message)
